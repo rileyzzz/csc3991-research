@@ -146,6 +146,7 @@ static void updateInput(GLFWwindow* window, float dt)
     cameraCenterPos += speed * cameraRight;
   if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
     cameraCenterPos -= speed * cameraRight;
+  cameraCenterPos.y = 0;
 
   bool wasDraggingMouse = bDraggingMouse;
   bDraggingMouse = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
@@ -163,7 +164,7 @@ static void updateInput(GLFWwindow* window, float dt)
 
     double dx = mx - lastx;
     double dy = my - lasty;
-    cameraOrbitRot += glm::vec3(0, -dx, -dy) * 50.f * dt;
+    cameraOrbitRot += glm::vec3(0, -dx, -dy) * 20.f * dt;
     cameraOrbitRot.z = std::clamp(cameraOrbitRot.z, glm::radians(-89.f), glm::radians(89.f));
 
     lastx = mx;
@@ -185,7 +186,8 @@ static void updateCamera(GLFWwindow* window)
   view = glm::mat4(1.f);
   view = glm::translate(view, glm::vec3(0, 0, cameraDist));
   view = glm::eulerAngleZYX(cameraOrbitRot.x, cameraOrbitRot.y, cameraOrbitRot.z) * view;
-  view = glm::translate(view, cameraCenterPos);
+  //view = glm::translate(view, cameraCenterPos);
+  view[3] += glm::vec4(cameraCenterPos, 0);
 
   viewProj = proj * glm::inverse(view);
 
