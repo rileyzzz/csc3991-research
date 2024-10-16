@@ -4,8 +4,12 @@
 #include <filesystem>
 #include <memory>
 #include "mesh.h"
+#include "shader.h"
+
+static std::unique_ptr<ShaderProgram> simpleMaterial;
 
 static std::unique_ptr<Mesh> loadMesh(const std::string& mesh);
+static void loadShaders();
 
 void glfwErrorCallback(int error, const char* description)
 {
@@ -41,6 +45,9 @@ int main()
     return -1;
   }
 
+  // Load shaders.
+  loadShaders();
+
   auto monkey = loadMesh("monkey.obj");
 
   // Main loop.
@@ -52,7 +59,8 @@ int main()
     glClearColor(0.3f, 0.3f, 0.3f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    // monkey->draw();
+    simpleMaterial->bind();
+    monkey->draw();
 
     glfwSwapBuffers(window);
     glfwPollEvents();
@@ -67,4 +75,17 @@ static std::unique_ptr<Mesh> loadMesh(const std::string& mesh)
   std::filesystem::path meshPath = std::filesystem::path(SCENE_DIR) / mesh;
 
   return std::make_unique<Mesh>(meshPath.string());
+}
+
+static void loadShaders()
+{
+  std::filesystem::path vertPath = std::filesystem::path(SHADERS_DIR) / "simple.vs";
+  std::filesystem::path fragPath = std::filesystem::path(SHADERS_DIR) / "simple.fs";
+
+  // these are destructed when the function exits.
+  Shader vert(GL_VERTEX_SHADER, vertPath.string());
+  Shader frag(GL_FRAGMENT_SHADER, fragPath.string());
+
+  std::vector<Shader*> progs = { &vert, &frag };
+  simpleMaterial = std::make_unique<ShaderProgram>(progs);
 }

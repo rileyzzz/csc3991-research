@@ -17,6 +17,9 @@ file(GLOB_RECURSE LEMMLER2024_SOURCES
     src/*.h
     src/*.hpp
     include/*.h
+	# shader/*.vs
+	# shader/*.fs
+	# shader/*.cs
 	)
 
 
@@ -25,4 +28,5 @@ add_executable(Sample ${LEMMLER2024_SOURCES})
 target_link_libraries(Sample PRIVATE opengl32 glfw glm::glm)
 # target_include_directories(Sample PRIVATE ./src)
 target_compile_definitions(Sample PRIVATE "SCENE_DIR=\"${CMAKE_SOURCE_DIR}/mesh\"")
+target_compile_definitions(Sample PRIVATE "SHADERS_DIR=\"${CMAKE_SOURCE_DIR}/shader\"")
 target_include_directories(Sample PUBLIC ./include)
