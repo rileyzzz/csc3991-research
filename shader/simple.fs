@@ -13,7 +13,7 @@ void main()
   vec3 lightPos = vec3(3, 3, 3);
   vec3 objectColor = vec3(0.2, 0.2, 1.0);
 
-  float ambientStrength = 0.1;
+  float ambientStrength = 0.2;
   float specularStrength = 0.8;
 
   vec3 vecToLight = normalize(lightPos - fragPos.xyz);
