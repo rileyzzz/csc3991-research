@@ -2,11 +2,10 @@
 #include <GLFW/glfw3.h>
 #include <iostream>
 #include <filesystem>
+#include <memory>
+#include "mesh.h"
 
-#define TINYOBJLOADER_IMPLEMENTATION
-#include <tiny_obj_loader.h>
-
-static void loadMesh(const std::string& mesh);
+static std::unique_ptr<Mesh> loadMesh(const std::string& mesh);
 
 void glfwErrorCallback(int error, const char* description)
 {
@@ -42,7 +41,7 @@ int main()
     return -1;
   }
 
-  loadMesh("monkey.obj");
+  auto monkey = loadMesh("monkey.obj");
 
   // Main loop.
   for (;;)
@@ -56,26 +55,9 @@ int main()
   glfwTerminate();
 }
 
-static void loadMesh(const std::string& mesh)
+static std::unique_ptr<Mesh> loadMesh(const std::string& mesh)
 {
   std::filesystem::path meshPath = std::filesystem::path(SCENE_DIR) / mesh;
 
-  tinyobj::ObjReaderConfig reader_config;
-  //reader_config.mtl_search_path = "./"; // Path to material files
-
-  tinyobj::ObjReader reader;
-
-  if (!reader.ParseFromFile(meshPath.string(), reader_config))
-  {
-    if (!reader.Error().empty())
-    {
-      std::cerr << "TinyObjReader: " << reader.Error();
-    }
-    exit(-1);
-  }
-
-  if (!reader.Warning().empty())
-  {
-    std::cout << "TinyObjReader: " << reader.Warning();
-  }
+  return std::make_unique<Mesh>(meshPath.string());
 }
