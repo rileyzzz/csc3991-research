@@ -41,9 +41,52 @@ MeshPart::MeshPart(const MeshPartData& data)
 
 MeshPart::~MeshPart()
 {
-  glDeleteVertexArrays(1, &VAO);
-  glDeleteBuffers(1, &VBO);
-  glDeleteBuffers(1, &EBO);
+  if (VAO)
+  {
+    glDeleteVertexArrays(1, &VAO);
+    VAO = 0;
+  }
+
+  if (VBO)
+  {
+    glDeleteBuffers(1, &VBO);
+    VBO = 0;
+  }
+
+  if (EBO)
+  {
+    glDeleteBuffers(1, &EBO);
+    EBO = 0;
+  }
+}
+
+MeshPart::MeshPart(MeshPart&& rhs) noexcept
+  : VAO(rhs.VAO)
+  , VBO(rhs.VBO)
+  , EBO(rhs.EBO)
+  , numElements(rhs.numElements)
+{
+  rhs.VAO = 0;
+  rhs.VBO = 0;
+  rhs.EBO = 0;
+  rhs.numElements = 0;
+}
+
+MeshPart& MeshPart::operator=(MeshPart&& rhs) noexcept
+{
+  VAO = rhs.VAO;
+  rhs.VAO = 0;
+
+  VBO = rhs.VBO;
+  rhs.VBO = 0;
+
+  EBO = rhs.EBO;
+  rhs.EBO = 0;
+
+  numElements = rhs.numElements;
+  rhs.numElements = 0;
+
+  return *this;
 }
 
 void MeshPart::draw() const
@@ -54,6 +97,7 @@ void MeshPart::draw() const
 
 Mesh::Mesh(const std::string& path)
 {
+  loadFromFile(path);
 }
 
 Mesh::~Mesh()
@@ -89,7 +133,8 @@ void Mesh::loadFromFile(const std::string& file)
   auto& materials = reader.GetMaterials();
 
   std::vector<MeshPartData> partData;
-  partData.resize(materials.size(), MeshPartData());
+  // Add an extra default material.
+  partData.resize(1 + materials.size(), MeshPartData());
 
   // Loop over shapes
   for (size_t iShape = 0; iShape < shapes.size(); iShape++)
@@ -102,7 +147,7 @@ void Mesh::loadFromFile(const std::string& file)
     for (size_t iFace = 0; iFace < mesh.num_face_vertices.size(); ++iFace)
     {
       int materialId = mesh.material_ids[iFace];
-      MeshPartData& part = partData[materialId];
+      MeshPartData& part = partData[materialId + 1];
 
       size_t fv = size_t(mesh.num_face_vertices[iFace]);
       if (fv != 3)

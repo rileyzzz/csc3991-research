@@ -13,7 +13,7 @@ public:
   Shader(GLuint type, const std::string& path);
   ~Shader();
   
-  // delete move constructor
+  // delete copy constructor
   Shader(const Shader&) = delete;
   Shader& operator=(const Shader&) = delete;
 
@@ -32,7 +32,7 @@ public:
   ShaderProgram(const std::vector<Shader*>& link);
   ~ShaderProgram();
 
-  // delete move constructor
+  // delete copy constructor
   ShaderProgram(const ShaderProgram&) = delete;
   ShaderProgram& operator=(const ShaderProgram&) = delete;
 

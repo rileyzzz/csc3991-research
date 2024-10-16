@@ -52,6 +52,13 @@ public:
   MeshPart(const MeshPartData& data);
   ~MeshPart();
 
+  MeshPart(MeshPart&& rhs) noexcept;
+  MeshPart& operator=(MeshPart&& rhs) noexcept;
+
+  // delete copy constructor
+  MeshPart(const MeshPart&) = delete;
+  MeshPart& operator=(const MeshPart&) = delete;
+
   void draw() const;
 };
 
