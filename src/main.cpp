@@ -76,7 +76,7 @@ int main()
   // Load shaders.
   loadShaders();
 
-  auto monkey = loadMesh("monkey.obj");
+  auto monkey = loadMesh("monkey_high.obj");
 
   // Setup.
   glEnable(GL_DEPTH_TEST);
@@ -138,15 +138,24 @@ static void updateInput(GLFWwindow* window, float dt)
 {
   const float speed = 10.f * dt;
 
+  glm::vec3 offsetCameraPos = glm::vec3(0, 0, 0);
   if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-    cameraCenterPos += speed * cameraForward;
+    offsetCameraPos += speed * cameraForward;
   if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-    cameraCenterPos -= speed * cameraForward;
+    offsetCameraPos -= speed * cameraForward;
   if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-    cameraCenterPos += speed * cameraRight;
+    offsetCameraPos += speed * cameraRight;
   if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-    cameraCenterPos -= speed * cameraRight;
-  cameraCenterPos.y = 0;
+    offsetCameraPos -= speed * cameraRight;
+  offsetCameraPos.y = 0;
+
+  if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
+    offsetCameraPos.y += speed * 0.5f;
+
+  if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
+    offsetCameraPos.y -= speed * 0.5f;
+
+  cameraCenterPos += offsetCameraPos;
 
   bool wasDraggingMouse = bDraggingMouse;
   bDraggingMouse = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
