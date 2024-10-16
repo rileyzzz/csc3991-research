@@ -23,18 +23,27 @@ MeshPart::MeshPart(const MeshPartData& data)
   glBufferData(GL_ELEMENT_ARRAY_BUFFER, data.idx.size() * sizeof(unsigned short), (void*)data.idx.data(), GL_STATIC_DRAW);
   numElements = data.idx.size();
 
+  size_t size;
+  size_t offset = 0;
+
   // Setup VAO:
   // position
+  size = 3 * sizeof(float);
   glEnableVertexAttribArray(0);
-  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(MeshVertex), (void*)offset);
+  offset += size;
 
   // normal
+  size = 3 * sizeof(float);
   glEnableVertexAttribArray(1);
-  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(MeshVertex), (void*)offset);
+  offset += size;
 
   // uv
+  size = 2 * sizeof(float);
   glEnableVertexAttribArray(2);
-  glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+  glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(MeshVertex), (void*)offset);
+  offset += size;
 
   glBindVertexArray(0);
 }
