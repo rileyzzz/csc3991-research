@@ -6,12 +6,59 @@
 
 #include <iostream>
 
+
+MeshPart::MeshPart(const MeshPartData& data)
+{
+  glGenVertexArrays(1, &VAO);
+  glBindVertexArray(VAO);
+
+  // init VBO
+  glGenBuffers(1, &VBO);
+  glBindBuffer(GL_ARRAY_BUFFER, VBO);
+  glBufferData(GL_ARRAY_BUFFER, data.vtx.size() * sizeof(MeshVertex), (void*)data.vtx.data(), GL_STATIC_DRAW);
+
+  // init EBO
+  glGenBuffers(1, &EBO);
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, data.idx.size() * sizeof(unsigned short), (void*)data.idx.data(), GL_STATIC_DRAW);
+  numElements = data.idx.size();
+
+  // Setup VAO:
+  // position
+  glEnableVertexAttribArray(0);
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+
+  // normal
+  glEnableVertexAttribArray(1);
+  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+
+  // uv
+  glEnableVertexAttribArray(2);
+  glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+
+  glBindVertexArray(0);
+}
+
+MeshPart::~MeshPart()
+{
+  glDeleteVertexArrays(1, &VAO);
+  glDeleteBuffers(1, &VBO);
+  glDeleteBuffers(1, &EBO);
+}
+
+void MeshPart::draw() const
+{
+  glBindVertexArray(VAO);
+  glDrawElements(GL_TRIANGLES, numElements, GL_UNSIGNED_SHORT, 0);
+}
+
 Mesh::Mesh(const std::string& path)
 {
 }
 
 Mesh::~Mesh()
 {
+  m_parts.clear();
 }
 
 void Mesh::loadFromFile(const std::string& file)
@@ -41,43 +88,95 @@ void Mesh::loadFromFile(const std::string& file)
   auto& shapes = reader.GetShapes();
   auto& materials = reader.GetMaterials();
 
+  std::vector<MeshPartData> partData;
+  partData.resize(materials.size(), MeshPartData());
+
   // Loop over shapes
-  for (size_t s = 0; s < shapes.size(); s++) {
+  for (size_t iShape = 0; iShape < shapes.size(); iShape++)
+  {
+    const tinyobj::shape_t& shape = shapes[iShape];
+    const tinyobj::mesh_t& mesh = shape.mesh;
+
     // Loop over faces(polygon)
     size_t index_offset = 0;
-    for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
-      size_t fv = size_t(shapes[s].mesh.num_face_vertices[f]);
+    for (size_t iFace = 0; iFace < mesh.num_face_vertices.size(); ++iFace)
+    {
+      int materialId = mesh.material_ids[iFace];
+      MeshPartData& part = partData[materialId];
 
-      // Loop over vertices in the face.
+      size_t fv = size_t(mesh.num_face_vertices[iFace]);
+      if (fv != 3)
+      {
+        std::cerr << "Non-triangle meshes not supported!\n";
+        index_offset += fv;
+        continue;
+      }
+
+
       for (size_t v = 0; v < fv; v++) {
         // access to vertex
-        tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
-        tinyobj::real_t vx = attrib.vertices[3 * size_t(idx.vertex_index) + 0];
-        tinyobj::real_t vy = attrib.vertices[3 * size_t(idx.vertex_index) + 1];
-        tinyobj::real_t vz = attrib.vertices[3 * size_t(idx.vertex_index) + 2];
+        tinyobj::index_t idx = mesh.indices[index_offset + v];
+        MeshIndexKey triple{ idx.vertex_index, idx.normal_index, idx.texcoord_index };
+        auto found = part.idxToVtxCache.find(triple);
+        unsigned short iVertex;
+        
+        if (found != part.idxToVtxCache.end())
+        {
+          iVertex = found->second;
+        }
+        else
+        {
+          // Cache this vertex.
+          MeshVertex vertex;
 
-        // Check if `normal_index` is zero or positive. negative = no normal data
-        if (idx.normal_index >= 0) {
-          tinyobj::real_t nx = attrib.normals[3 * size_t(idx.normal_index) + 0];
-          tinyobj::real_t ny = attrib.normals[3 * size_t(idx.normal_index) + 1];
-          tinyobj::real_t nz = attrib.normals[3 * size_t(idx.normal_index) + 2];
+          tinyobj::real_t vx = attrib.vertices[3 * size_t(idx.vertex_index) + 0];
+          tinyobj::real_t vy = attrib.vertices[3 * size_t(idx.vertex_index) + 1];
+          tinyobj::real_t vz = attrib.vertices[3 * size_t(idx.vertex_index) + 2];
+          vertex.position = glm::vec3(vx, vy, vz);
+
+          // Check if `normal_index` is zero or positive. negative = no normal data
+          if (idx.normal_index >= 0) {
+            tinyobj::real_t nx = attrib.normals[3 * size_t(idx.normal_index) + 0];
+            tinyobj::real_t ny = attrib.normals[3 * size_t(idx.normal_index) + 1];
+            tinyobj::real_t nz = attrib.normals[3 * size_t(idx.normal_index) + 2];
+            vertex.normal = glm::vec3(nx, ny, nz);
+          }
+
+          // Check if `texcoord_index` is zero or positive. negative = no texcoord data
+          if (idx.texcoord_index >= 0) {
+            tinyobj::real_t tx = attrib.texcoords[2 * size_t(idx.texcoord_index) + 0];
+            tinyobj::real_t ty = attrib.texcoords[2 * size_t(idx.texcoord_index) + 1];
+            vertex.uv = glm::vec2(tx, ty);
+          }
+
+          // Optional: vertex colors
+          // tinyobj::real_t red   = attrib.colors[3*size_t(idx.vertex_index)+0];
+          // tinyobj::real_t green = attrib.colors[3*size_t(idx.vertex_index)+1];
+          // tinyobj::real_t blue  = attrib.colors[3*size_t(idx.vertex_index)+2];
+
+          // Only support ushort indices.
+          if (part.vtx.size() >= std::numeric_limits<unsigned short>::max())
+            std::cerr << "Index out of bounds!\n";
+
+          iVertex = part.vtx.size();
+          part.vtx.push_back(vertex);
+          part.idxToVtxCache[triple] = iVertex;
         }
 
-        // Check if `texcoord_index` is zero or positive. negative = no texcoord data
-        if (idx.texcoord_index >= 0) {
-          tinyobj::real_t tx = attrib.texcoords[2 * size_t(idx.texcoord_index) + 0];
-          tinyobj::real_t ty = attrib.texcoords[2 * size_t(idx.texcoord_index) + 1];
-        }
-
-        // Optional: vertex colors
-        // tinyobj::real_t red   = attrib.colors[3*size_t(idx.vertex_index)+0];
-        // tinyobj::real_t green = attrib.colors[3*size_t(idx.vertex_index)+1];
-        // tinyobj::real_t blue  = attrib.colors[3*size_t(idx.vertex_index)+2];
+        // Add vertex to index list.
+        part.idx.push_back(iVertex);
       }
       index_offset += fv;
-
-      // per-face material
-      shapes[s].mesh.material_ids[f];
     }
   }
+
+  // Finalize parts.
+  for (int iPart = 0; iPart < partData.size(); ++iPart)
+    m_parts.emplace_back(partData[iPart]);
+}
+
+void Mesh::draw() const
+{
+  for (const MeshPart& part : m_parts)
+    part.draw();
 }

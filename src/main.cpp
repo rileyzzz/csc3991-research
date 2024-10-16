@@ -49,6 +49,13 @@ int main()
     if (glfwWindowShouldClose(window))
       break;
 
+    glClearColor(0.3f, 0.3f, 0.3f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    // monkey->draw();
+
+    glfwSwapBuffers(window);
+    glfwPollEvents();
   }
 
   glfwDestroyWindow(window);
