@@ -61,7 +61,13 @@ ShaderProgram::~ShaderProgram()
   glDeleteProgram(prog);
 }
 
-void ShaderProgram::bind()
+
+int ShaderProgram::getUniformLocation(const char* uniform) const
+{
+  return glGetUniformLocation(prog, uniform);
+}
+
+void ShaderProgram::bind(void) const
 {
   glUseProgram(prog);
 }

@@ -36,7 +36,8 @@ public:
   ShaderProgram(const ShaderProgram&) = delete;
   ShaderProgram& operator=(const ShaderProgram&) = delete;
 
-  void bind();
+  int getUniformLocation(const char* uniform) const;
+  void bind(void) const;
 
 protected:
   void create(const std::vector<Shader*>& link);

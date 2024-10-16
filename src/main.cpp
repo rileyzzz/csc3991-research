@@ -6,10 +6,22 @@
 #include "mesh.h"
 #include "shader.h"
 
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/euler_angles.hpp>
+
+static glm::mat4 proj;
+static glm::mat4 viewProj;
+static glm::vec3 cameraPos;
+static glm::vec3 cameraRot;
+static float cameraDist = 2.f;
+
 static std::unique_ptr<ShaderProgram> simpleMaterial;
 
 static std::unique_ptr<Mesh> loadMesh(const std::string& mesh);
 static void loadShaders();
+static void updateCamera(GLFWwindow* window);
 
 void glfwErrorCallback(int error, const char* description)
 {
@@ -50,16 +62,25 @@ int main()
 
   auto monkey = loadMesh("monkey.obj");
 
+  // Setup.
+  glEnable(GL_DEPTH_TEST);
+
   // Main loop.
   for (;;)
   {
     if (glfwWindowShouldClose(window))
       break;
 
+    updateCamera(window);
+
     glClearColor(0.3f, 0.3f, 0.3f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     simpleMaterial->bind();
+
+    // Set uniforms.
+    glUniformMatrix4fv(simpleMaterial->getUniformLocation("viewProj"), 1, GL_FALSE, glm::value_ptr(viewProj));
+
     monkey->draw();
 
     glfwSwapBuffers(window);
@@ -88,4 +109,23 @@ static void loadShaders()
 
   std::vector<Shader*> progs = { &vert, &frag };
   simpleMaterial = std::make_unique<ShaderProgram>(progs);
+}
+
+static void updateCamera(GLFWwindow* window)
+{
+  int w, h;
+  glfwGetWindowSize(window, &w, &h);
+  glViewport(0, 0, w, h);
+
+  float aspect = (float)w / (float)h;
+
+  // Camera setup.
+  proj = glm::perspective(80.f, aspect, 0.1f, 100.f);
+
+  glm::mat4 view = glm::mat4(1.f);
+  view = glm::translate(view, glm::vec3(0, 0, cameraDist));
+  view = glm::eulerAngleXYZ(cameraRot.x, cameraRot.y, cameraRot.z) * view;
+  view = glm::translate(view, cameraPos);
+
+  viewProj = proj * glm::inverse(view);
 }
