@@ -12,20 +12,34 @@
 #include <glm/gtx/euler_angles.hpp>
 
 static glm::mat4 proj;
+static glm::mat4 view;
 static glm::mat4 viewProj;
+static glm::vec3 cameraCenterPos;
+static glm::vec3 cameraOrbitRot;
+static float cameraDist = 5.f;
+
 static glm::vec3 cameraPos;
-static glm::vec3 cameraRot;
-static float cameraDist = 2.f;
+static glm::vec3 cameraForward;
+static glm::vec3 cameraRight;
+
+static bool bDraggingMouse = false;
 
 static std::unique_ptr<ShaderProgram> simpleMaterial;
 
 static std::unique_ptr<Mesh> loadMesh(const std::string& mesh);
-static void loadShaders();
+static void loadShaders(void);
+static void updateInput(GLFWwindow* window, float dt);
 static void updateCamera(GLFWwindow* window);
 
 void glfwErrorCallback(int error, const char* description)
 {
   fprintf(stderr, "Error: %s\n", description);
+}
+
+void glfwScrollCallback(GLFWwindow* window, double xoffset, double yoffset)
+{
+  cameraDist -= yoffset;
+  cameraDist = std::clamp(cameraDist, 1.f, 10.f);
 }
 
 int main()
@@ -48,6 +62,8 @@ int main()
     return -1;
   }
 
+  glfwSetScrollCallback(window, glfwScrollCallback);
+
   // Make the context current.
   glfwMakeContextCurrent(window);
 
@@ -66,12 +82,18 @@ int main()
   glEnable(GL_DEPTH_TEST);
 
   // Main loop.
+  double lastTime = glfwGetTime();
   for (;;)
   {
     if (glfwWindowShouldClose(window))
       break;
 
+    float time = glfwGetTime();
+    float dt = time - lastTime;
+    lastTime = time;
+
     updateCamera(window);
+    updateInput(window, dt);
 
     glClearColor(0.3f, 0.3f, 0.3f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -80,7 +102,8 @@ int main()
 
     // Set uniforms.
     glUniformMatrix4fv(simpleMaterial->getUniformLocation("viewProj"), 1, GL_FALSE, glm::value_ptr(viewProj));
-
+    glUniform3fv(simpleMaterial->getUniformLocation("viewPos"), 1, glm::value_ptr(cameraPos));
+    
     monkey->draw();
 
     glfwSwapBuffers(window);
@@ -98,7 +121,7 @@ static std::unique_ptr<Mesh> loadMesh(const std::string& mesh)
   return std::make_unique<Mesh>(meshPath.string());
 }
 
-static void loadShaders()
+static void loadShaders(void)
 {
   std::filesystem::path vertPath = std::filesystem::path(SHADERS_DIR) / "simple.vs";
   std::filesystem::path fragPath = std::filesystem::path(SHADERS_DIR) / "simple.fs";
@@ -111,6 +134,43 @@ static void loadShaders()
   simpleMaterial = std::make_unique<ShaderProgram>(progs);
 }
 
+static void updateInput(GLFWwindow* window, float dt)
+{
+  const float speed = 10.f * dt;
+
+  if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+    cameraCenterPos += speed * cameraForward;
+  if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+    cameraCenterPos -= speed * cameraForward;
+  if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+    cameraCenterPos += speed * cameraRight;
+  if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+    cameraCenterPos -= speed * cameraRight;
+
+  bool wasDraggingMouse = bDraggingMouse;
+  bDraggingMouse = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
+  if (bDraggingMouse)
+  {
+    static double lastx, lasty;
+    double mx, my;
+    glfwGetCursorPos(window, &mx, &my);
+
+    if (!wasDraggingMouse)
+    {
+      lastx = mx;
+      lasty = my;
+    }
+
+    double dx = mx - lastx;
+    double dy = my - lasty;
+    cameraOrbitRot += glm::vec3(0, -dx, -dy) * 50.f * dt;
+    cameraOrbitRot.z = std::clamp(cameraOrbitRot.z, glm::radians(-89.f), glm::radians(89.f));
+
+    lastx = mx;
+    lasty = my;
+  }
+}
+
 static void updateCamera(GLFWwindow* window)
 {
   int w, h;
@@ -120,12 +180,16 @@ static void updateCamera(GLFWwindow* window)
   float aspect = (float)w / (float)h;
 
   // Camera setup.
-  proj = glm::perspective(80.f, aspect, 0.1f, 100.f);
+  proj = glm::perspective(glm::radians(60.f), aspect, 0.01f, 10.f);
 
-  glm::mat4 view = glm::mat4(1.f);
+  view = glm::mat4(1.f);
   view = glm::translate(view, glm::vec3(0, 0, cameraDist));
-  view = glm::eulerAngleXYZ(cameraRot.x, cameraRot.y, cameraRot.z) * view;
-  view = glm::translate(view, cameraPos);
+  view = glm::eulerAngleZYX(cameraOrbitRot.x, cameraOrbitRot.y, cameraOrbitRot.z) * view;
+  view = glm::translate(view, cameraCenterPos);
 
   viewProj = proj * glm::inverse(view);
+
+  cameraPos = glm::vec3(view[3]);
+  cameraForward = glm::vec3(view * glm::vec4(0, 0, -1, 0));
+  cameraRight = glm::vec3(view * glm::vec4(1, 0, 0, 0));
 }
