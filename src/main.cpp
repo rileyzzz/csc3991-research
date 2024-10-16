@@ -5,6 +5,7 @@
 #include <memory>
 #include "mesh.h"
 #include "shader.h"
+#include "texture.h"
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtc/matrix_transform.hpp>
@@ -25,6 +26,7 @@ static glm::vec3 cameraRight;
 static bool bDraggingMouse = false;
 
 static std::unique_ptr<ShaderProgram> simpleMaterial;
+static std::unique_ptr<Texture> dispTex;
 
 static std::unique_ptr<Mesh> loadMesh(const std::string& mesh);
 static void loadShaders(void);
@@ -76,7 +78,10 @@ int main()
   // Load shaders.
   loadShaders();
 
+  //auto monkey = loadMesh("cube.obj");
   auto monkey = loadMesh("monkey_high.obj");
+
+  dispTex = std::make_unique<Texture>((std::filesystem::path(SCENE_DIR) / "brick.jpg").string());
 
   // Setup.
   glEnable(GL_DEPTH_TEST);
@@ -104,6 +109,11 @@ int main()
     glUniformMatrix4fv(simpleMaterial->getUniformLocation("viewProj"), 1, GL_FALSE, glm::value_ptr(viewProj));
     glUniform3fv(simpleMaterial->getUniformLocation("viewPos"), 1, glm::value_ptr(cameraPos));
     
+    //glUniform1i(simpleMaterial->getUniformLocation("displacement"), 0);
+
+    glActiveTexture(GL_TEXTURE0);
+    dispTex->bind();
+
     monkey->draw();
 
     glfwSwapBuffers(window);
