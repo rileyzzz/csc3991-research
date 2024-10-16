@@ -20,7 +20,7 @@ MeshPart::MeshPart(const MeshPartData& data)
   // init EBO
   glGenBuffers(1, &EBO);
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-  glBufferData(GL_ELEMENT_ARRAY_BUFFER, data.idx.size() * sizeof(unsigned short), (void*)data.idx.data(), GL_STATIC_DRAW);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, data.idx.size() * sizeof(unsigned int), (void*)data.idx.data(), GL_STATIC_DRAW);
   numElements = data.idx.size();
 
   size_t size;
@@ -101,7 +101,7 @@ MeshPart& MeshPart::operator=(MeshPart&& rhs) noexcept
 void MeshPart::draw() const
 {
   glBindVertexArray(VAO);
-  glDrawElements(GL_TRIANGLES, numElements, GL_UNSIGNED_SHORT, 0);
+  glDrawElements(GL_TRIANGLES, numElements, GL_UNSIGNED_INT, 0);
 }
 
 Mesh::Mesh(const std::string& path)
@@ -172,7 +172,7 @@ void Mesh::loadFromFile(const std::string& file)
         tinyobj::index_t idx = mesh.indices[index_offset + v];
         MeshIndexKey triple{ idx.vertex_index, idx.normal_index, idx.texcoord_index };
         auto found = part.idxToVtxCache.find(triple);
-        unsigned short iVertex;
+        unsigned int iVertex;
         
         if (found != part.idxToVtxCache.end())
         {
@@ -208,8 +208,8 @@ void Mesh::loadFromFile(const std::string& file)
           // tinyobj::real_t green = attrib.colors[3*size_t(idx.vertex_index)+1];
           // tinyobj::real_t blue  = attrib.colors[3*size_t(idx.vertex_index)+2];
 
-          // Only support ushort indices.
-          if (part.vtx.size() >= std::numeric_limits<unsigned short>::max())
+          // Only support uint indices.
+          if (part.vtx.size() >= std::numeric_limits<unsigned int>::max())
             std::cerr << "Index out of bounds!\n";
 
           iVertex = part.vtx.size();

@@ -78,8 +78,8 @@ int main()
   // Load shaders.
   loadShaders();
 
-  //auto monkey = loadMesh("cube.obj");
-  auto monkey = loadMesh("monkey_high.obj");
+  auto monkey = loadMesh("cube_high.obj");
+  //auto monkey = loadMesh("monkey_high.obj");
 
   dispTex = std::make_unique<Texture>((std::filesystem::path(SCENE_DIR) / "brick.jpg").string());
 
@@ -183,7 +183,7 @@ static void updateInput(GLFWwindow* window, float dt)
 
     double dx = mx - lastx;
     double dy = my - lasty;
-    cameraOrbitRot += glm::vec3(0, -dx, -dy) * 20.f * dt;
+    cameraOrbitRot += glm::vec3(0, -dx, -dy / 1.5f) * 10.f * dt;
     cameraOrbitRot.z = std::clamp(cameraOrbitRot.z, glm::radians(-89.f), glm::radians(89.f));
 
     lastx = mx;

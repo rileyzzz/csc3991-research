@@ -36,7 +36,7 @@ struct std::hash<MeshIndexKey>
 struct MeshPartData
 {
   std::vector<MeshVertex> vtx;
-  std::vector<unsigned short> idx;
+  std::vector<unsigned int> idx;
 
   std::unordered_map<MeshIndexKey, int> idxToVtxCache;
 };
