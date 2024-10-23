@@ -78,7 +78,7 @@ int main()
   // Load shaders.
   loadShaders();
 
-  auto monkey = loadMesh("cube_high.obj");
+  auto monkey = loadMesh("cube.obj");
   //auto monkey = loadMesh("monkey_high.obj");
 
   dispTex = std::make_unique<Texture>((std::filesystem::path(SCENE_DIR) / "brick.jpg").string());
@@ -122,6 +122,11 @@ int main()
 
   glfwDestroyWindow(window);
   glfwTerminate();
+}
+
+static void generateSurfaceGeometry()
+{
+
 }
 
 static std::unique_ptr<Mesh> loadMesh(const std::string& mesh)

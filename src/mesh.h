@@ -62,6 +62,16 @@ public:
   void draw() const;
 };
 
+class BufferMesh
+{
+public:
+  BufferMesh();
+  ~BufferMesh();
+
+  void loadFromFile(const std::string& file);
+
+};
+
 class Mesh
 {
 protected:
