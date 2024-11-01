@@ -28,6 +28,8 @@ public:
   StorageBuffer(void* data, size_t len);
   ~StorageBuffer();
 
+  void bind(int target) const;
+
   // Delete copy constructors
   StorageBuffer(const StorageBuffer&) = delete;
   StorageBuffer& operator=(const StorageBuffer&) = delete;

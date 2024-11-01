@@ -69,81 +69,28 @@ MeshPart::~MeshPart()
   }
 }
 
-MeshPart::MeshPart(MeshPart&& rhs) noexcept
-  : VAO(rhs.VAO)
-  , VBO(rhs.VBO)
-  , EBO(rhs.EBO)
-  , numElements(rhs.numElements)
-{
-  rhs.VAO = 0;
-  rhs.VBO = 0;
-  rhs.EBO = 0;
-  rhs.numElements = 0;
-}
-
-MeshPart& MeshPart::operator=(MeshPart&& rhs) noexcept
-{
-  VAO = rhs.VAO;
-  rhs.VAO = 0;
-
-  VBO = rhs.VBO;
-  rhs.VBO = 0;
-
-  EBO = rhs.EBO;
-  rhs.EBO = 0;
-
-  numElements = rhs.numElements;
-  rhs.numElements = 0;
-
-  return *this;
-}
-
 void MeshPart::draw() const
 {
   glBindVertexArray(VAO);
   glDrawElements(GL_TRIANGLES, numElements, GL_UNSIGNED_INT, 0);
 }
 
-Mesh::Mesh(const std::string& path)
+
+static void loadParts(tinyobj::ObjReader& reader, std::vector<MeshPartData>& partData, bool ignoreMaterials = false)
 {
-  loadFromFile(path);
-}
-
-Mesh::~Mesh()
-{
-  m_parts.clear();
-}
-
-void Mesh::loadFromFile(const std::string& file)
-{
-  tinyobj::ObjReaderConfig reader_config;
-  //reader_config.mtl_search_path = "./"; // Path to material files
-
-  tinyobj::ObjReader reader;
-
-  if (!reader.ParseFromFile(file, reader_config))
-  {
-    if (!reader.Error().empty())
-    {
-      std::cerr << "TinyObjReader: " << reader.Error();
-    }
-    exit(-1);
-  }
-
-  if (!reader.Warning().empty())
-  {
-    std::cout << "TinyObjReader: " << reader.Warning();
-  }
-
-  // Create buffers.
-
   auto& attrib = reader.GetAttrib();
   auto& shapes = reader.GetShapes();
   auto& materials = reader.GetMaterials();
 
-  std::vector<MeshPartData> partData;
   // Add an extra default material.
-  partData.resize(1 + materials.size(), MeshPartData());
+  if (!ignoreMaterials)
+  {
+    partData.resize(1 + materials.size(), MeshPartData());
+  }
+  else
+  {
+    partData.resize(1, MeshPartData());
+  }
 
   // Loop over shapes
   for (size_t iShape = 0; iShape < shapes.size(); iShape++)
@@ -156,6 +103,9 @@ void Mesh::loadFromFile(const std::string& file)
     for (size_t iFace = 0; iFace < mesh.num_face_vertices.size(); ++iFace)
     {
       int materialId = mesh.material_ids[iFace];
+      if (ignoreMaterials)
+        materialId = -1;
+      
       MeshPartData& part = partData[materialId + 1];
 
       size_t fv = size_t(mesh.num_face_vertices[iFace]);
@@ -173,7 +123,7 @@ void Mesh::loadFromFile(const std::string& file)
         MeshIndexKey triple{ idx.vertex_index, idx.normal_index, idx.texcoord_index };
         auto found = part.idxToVtxCache.find(triple);
         unsigned int iVertex;
-        
+
         if (found != part.idxToVtxCache.end())
         {
           iVertex = found->second;
@@ -223,6 +173,120 @@ void Mesh::loadFromFile(const std::string& file)
       index_offset += fv;
     }
   }
+}
+
+TargetGeometryStream::TargetGeometryStream(const MeshPartData& data)
+{
+  glCreateBuffers(1, &TriangleStream);
+
+  size_t numTriangles = data.idx.size() / 3;
+  numElements = numTriangles;
+
+  int tileBase = 0;
+  std::vector<Triangle> stream;
+  stream.resize(numTriangles);
+  for (size_t i = 0; i < numTriangles; i++)
+  {
+    const MeshVertex& v0 = data.vtx[data.idx[i * 3 + 0]];
+    const MeshVertex& v1 = data.vtx[data.idx[i * 3 + 1]];
+    const MeshVertex& v2 = data.vtx[data.idx[i * 3 + 2]];
+    stream[i].p0 = v0.position;
+    stream[i].p1 = v1.position;
+    stream[i].p2 = v2.position;
+
+    glm::vec3 normal = glm::normalize(glm::cross(v2.position - v0.position, v1.position - v0.position));
+    stream[i].normal = normal;
+    // TODO: This is wrong.
+    stream[i].tangent = glm::normalize(v1.position - v0.position);
+
+    // TODO: factor in area in compute shader.
+    int numTiles = 4;
+
+    stream[i].tileBase = tileBase;
+    stream[i].tileNum = numTiles;
+    tileBase += numTiles;
+  }
+
+  glNamedBufferStorage(TriangleStream, sizeof(Triangle) * numTriangles, stream.data(), 0);
+}
+
+TargetGeometryStream::~TargetGeometryStream()
+{
+  glDeleteBuffers(1, &TriangleStream);
+}
+
+void TargetGeometryStream::bind(int target) const
+{
+  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, target, TriangleStream);
+}
+
+TileGeometryStreams::TileGeometryStreams(const MeshPartData& data)
+{
+  glCreateBuffers(1, &VertexStream);
+  glCreateBuffers(1, &IndexStream);
+
+  std::vector<Vertex> vertices;
+
+  vertices.resize(data.vtx.size());
+  Vertex v;
+  for (size_t i = 0; i < data.vtx.size(); i++)
+  {
+    v.position = data.vtx[i].position;
+    v.normal = data.vtx[i].normal;
+    vertices[i] = v;
+  }
+
+  glNamedBufferStorage(VertexStream, sizeof(Vertex) * vertices.size(), vertices.data(), 0);
+  glNamedBufferStorage(IndexStream, sizeof(unsigned int) * data.idx.size(), data.idx.data(), 0);
+}
+
+TileGeometryStreams::~TileGeometryStreams()
+{
+  glDeleteBuffers(1, &VertexStream);
+  glDeleteBuffers(1, &IndexStream);
+}
+
+void TileGeometryStreams::bind(int vertex, int index) const
+{
+  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, vertex, VertexStream);
+  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, index, IndexStream);
+}
+
+Mesh::Mesh(const std::string& path)
+{
+  loadFromFile(path);
+}
+
+Mesh::~Mesh()
+{
+  m_parts.clear();
+}
+
+void Mesh::loadFromFile(const std::string& file)
+{
+  tinyobj::ObjReaderConfig reader_config;
+  //reader_config.mtl_search_path = "./"; // Path to material files
+
+  tinyobj::ObjReader reader;
+
+  if (!reader.ParseFromFile(file, reader_config))
+  {
+    if (!reader.Error().empty())
+    {
+      std::cerr << "TinyObjReader: " << reader.Error();
+    }
+    exit(-1);
+  }
+
+  if (!reader.Warning().empty())
+  {
+    std::cout << "TinyObjReader: " << reader.Warning();
+  }
+
+  // Create buffers.
+
+  std::vector<MeshPartData> partData;
+  loadParts(reader, partData);
 
   // Finalize parts.
   for (int iPart = 0; iPart < partData.size(); ++iPart)
@@ -233,4 +297,84 @@ void Mesh::draw() const
 {
   for (const MeshPart& part : m_parts)
     part.draw();
+}
+
+TargetMesh::TargetMesh(const std::string& file)
+{
+  loadFromFile(file);
+}
+
+TargetMesh::~TargetMesh()
+{
+}
+
+void TargetMesh::loadFromFile(const std::string& file)
+{
+  tinyobj::ObjReaderConfig reader_config;
+  tinyobj::ObjReader reader;
+
+  if (!reader.ParseFromFile(file, reader_config))
+  {
+    if (!reader.Error().empty())
+    {
+      std::cerr << "TinyObjReader: " << reader.Error();
+    }
+    exit(-1);
+  }
+
+  if (!reader.Warning().empty())
+  {
+    std::cout << "TinyObjReader: " << reader.Warning();
+  }
+
+  std::vector<MeshPartData> partData;
+  loadParts(reader, partData, true);
+
+  if (partData.size() != 1)
+  {
+    std::cerr << "Failed to load target mesh.\n";
+    return;
+  }
+
+  triStream = TargetGeometryStream(partData[0]);
+}
+
+TileMesh::TileMesh(const std::string& file)
+{
+  loadFromFile(file);
+}
+
+TileMesh::~TileMesh()
+{
+}
+
+void TileMesh::loadFromFile(const std::string& file)
+{
+  tinyobj::ObjReaderConfig reader_config;
+  tinyobj::ObjReader reader;
+
+  if (!reader.ParseFromFile(file, reader_config))
+  {
+    if (!reader.Error().empty())
+    {
+      std::cerr << "TinyObjReader: " << reader.Error();
+    }
+    exit(-1);
+  }
+
+  if (!reader.Warning().empty())
+  {
+    std::cout << "TinyObjReader: " << reader.Warning();
+  }
+
+  std::vector<MeshPartData> partData;
+  loadParts(reader, partData, true);
+
+  if (partData.size() != 1)
+  {
+    std::cerr << "Failed to load tile mesh.\n";
+    return;
+  }
+
+  tileStreams = TileGeometryStreams(partData[0]);
 }

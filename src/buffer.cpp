@@ -13,9 +13,7 @@ UniformBuffer::~UniformBuffer()
 
 void UniformBuffer::setData(void* data, size_t len)
 {
-  glBindBuffer(GL_UNIFORM_BUFFER, id);
-  glBufferData(GL_UNIFORM_BUFFER, len, data, GL_STATIC_DRAW);
-  glBindBuffer(GL_UNIFORM_BUFFER, 0);
+  glNamedBufferData(id, len, data, GL_STATIC_DRAW);
 }
 
 StorageBuffer::StorageBuffer(void* data, size_t len)
@@ -29,9 +27,12 @@ StorageBuffer::~StorageBuffer()
   glDeleteBuffers(1, &id);
 }
 
+void StorageBuffer::bind(int target) const
+{
+  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, target, id);
+}
+
 void StorageBuffer::setData(void* data, size_t len)
 {
-  glBindBuffer(GL_SHADER_STORAGE_BUFFER, id);
-  glBufferStorage(GL_SHADER_STORAGE_BUFFER, len, data, 0);
-  glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+  glNamedBufferStorage(id, len, data, 0);
 }

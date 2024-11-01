@@ -6,6 +6,7 @@
 #include "mesh.h"
 #include "shader.h"
 #include "texture.h"
+#include "buffer.h"
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtc/matrix_transform.hpp>
@@ -26,12 +27,19 @@ static glm::vec3 cameraRight;
 static bool bDraggingMouse = false;
 
 static std::unique_ptr<ShaderProgram> simpleMaterial;
+static std::unique_ptr<ShaderProgram> tilegen;
 static std::unique_ptr<Texture> dispTex;
+static std::unique_ptr<StorageBuffer> outputVertices;
+static std::unique_ptr<StorageBuffer> outputIndices;
 
 static std::unique_ptr<Mesh> loadMesh(const std::string& mesh);
+static std::unique_ptr<TargetMesh> loadTargetMesh(const std::string& mesh);
+static std::unique_ptr<TileMesh> loadTileMesh(const std::string& mesh);
 static void loadShaders(void);
 static void updateInput(GLFWwindow* window, float dt);
 static void updateCamera(GLFWwindow* window);
+
+static void generateSurfaceGeometry(const TargetMesh& target, const TileMesh& tile);
 
 void glfwErrorCallback(int error, const char* description)
 {
@@ -78,7 +86,15 @@ int main()
   // Load shaders.
   loadShaders();
 
+  auto target = loadTargetMesh("cube_simple.obj");
+  auto tile = loadTileMesh("tile_sphere.obj");
   auto monkey = loadMesh("cube.obj");
+
+  const int maxVertices = 1024;
+  const int maxIndices = 3 * 1024;
+  outputVertices = std::make_unique<StorageBuffer>(nullptr, 8 * sizeof(float) * maxVertices);
+  outputIndices = std::make_unique<StorageBuffer>(nullptr, sizeof(unsigned int) * maxIndices);
+
   //auto monkey = loadMesh("monkey_high.obj");
 
   dispTex = std::make_unique<Texture>((std::filesystem::path(SCENE_DIR) / "brick.jpg").string());
@@ -103,6 +119,9 @@ int main()
     glClearColor(0.3f, 0.3f, 0.3f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+    // Compute phase.
+    generateSurfaceGeometry(*target, *tile);
+
     simpleMaterial->bind();
 
     // Set uniforms.
@@ -124,29 +143,63 @@ int main()
   glfwTerminate();
 }
 
-static void generateSurfaceGeometry()
+static void generateSurfaceGeometry(const TargetMesh& target, const TileMesh& tile)
 {
+  target.bindGeometryStream(0);
+  tile.bindGeometryStreams(1, 2);
 
+  outputVertices->bind(3);
+  outputIndices->bind(4);
+
+  // Run the compute shader.
+  int numWorkgroupsX = (target.numTriangles() + 63) / 64;
+
+  tilegen->bind();
+  glDispatchCompute(numWorkgroupsX, 1, 1);
 }
 
 static std::unique_ptr<Mesh> loadMesh(const std::string& mesh)
 {
   std::filesystem::path meshPath = std::filesystem::path(SCENE_DIR) / mesh;
-
   return std::make_unique<Mesh>(meshPath.string());
+}
+
+static std::unique_ptr<TargetMesh> loadTargetMesh(const std::string& mesh)
+{
+  std::filesystem::path meshPath = std::filesystem::path(SCENE_DIR) / mesh;
+  return std::make_unique<TargetMesh>(meshPath.string());
+}
+
+static std::unique_ptr<TileMesh> loadTileMesh(const std::string& mesh)
+{
+  std::filesystem::path meshPath = std::filesystem::path(SCENE_DIR) / mesh;
+  return std::make_unique<TileMesh>(meshPath.string());
 }
 
 static void loadShaders(void)
 {
-  std::filesystem::path vertPath = std::filesystem::path(SHADERS_DIR) / "simple.vs";
-  std::filesystem::path fragPath = std::filesystem::path(SHADERS_DIR) / "simple.fs";
+  {
+    std::filesystem::path vertPath = std::filesystem::path(SHADERS_DIR) / "simple.vs";
+    std::filesystem::path fragPath = std::filesystem::path(SHADERS_DIR) / "simple.fs";
 
-  // these are destructed when the function exits.
-  Shader vert(GL_VERTEX_SHADER, vertPath.string());
-  Shader frag(GL_FRAGMENT_SHADER, fragPath.string());
+    // these are destructed when the function exits.
+    Shader vert(GL_VERTEX_SHADER, vertPath.string());
+    Shader frag(GL_FRAGMENT_SHADER, fragPath.string());
 
-  std::vector<Shader*> progs = { &vert, &frag };
-  simpleMaterial = std::make_unique<ShaderProgram>(progs);
+    std::vector<Shader*> progs = { &vert, &frag };
+    simpleMaterial = std::make_unique<ShaderProgram>(progs);
+  }
+
+  {
+    std::filesystem::path csPath = std::filesystem::path(SHADERS_DIR) / "tilegen.glsl";
+
+    // these are destructed when the function exits.
+    Shader computeProg(GL_COMPUTE_SHADER, csPath.string());
+
+    std::vector<Shader*> progs = { &computeProg };
+    tilegen = std::make_unique<ShaderProgram>(progs);
+  }
+
 }
 
 static void updateInput(GLFWwindow* window, float dt)

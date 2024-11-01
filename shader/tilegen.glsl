@@ -1,6 +1,6 @@
 #version 430 core
 
-layout (local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+layout (local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 
 struct Vertex {
     vec3 position;
@@ -37,19 +37,27 @@ layout(std430, binding = 3) buffer outputVertexStream
     Vertex out_Vertices[];
 };
 
-void projectOntoTriangle(inout vec3 v, in Triangle tri) {
-    vec3 bitangent = cross(normal, tangent);
+layout(std430, binding = 4) buffer outputIndexStream
+{
+    uint out_TileIndices[];
+};
+
+void projectOntoTriangle(inout Vertex v, in Triangle tri) {
+    vec3 bitangent = normalize(cross(tri.normal, tri.tangent));
     mat3 tangentBasis = mat3(tri.tangent, bitangent, tri.normal);
 
-    v = tangentBasis * v;
+    v.position = tangentBasis * v.position;
 }
 
 void main() {
-    int iTriangle = gl_GlobalInvocationID.x;
+    uint iTriangle = gl_GlobalInvocationID.x;
+    if (iTriangle > in_Triangles.length())
+        return;
+    
     int baseVertex = in_Triangles[iTriangle].tileBase * in_TileVertices.length();
     int baseIndex = in_Triangles[iTriangle].tileBase * in_TileIndices.length();
 
-    for (int iTile = 0; i < in_Triangles[iTriangle].tileNum; i++) {
+    for (int iTile = 0; iTile < in_Triangles[iTriangle].tileNum; iTile++) {
         for (int iVert = 0; iVert < in_TileVertices.length(); iVert++) {
             Vertex v = in_TileVertices[iVert];
             projectOntoTriangle(v, in_Triangles[iTriangle]);
@@ -57,7 +65,7 @@ void main() {
         }
 
         for (int iIndex = 0; iIndex < in_TileIndices.length(); iIndex++) {
-            out_Vertices[baseIndex + iIndex] = baseVertex + in_TileIndices[iIndex];
+            out_TileIndices[baseIndex + iIndex] = baseVertex + in_TileIndices[iIndex];
         }
 
         baseVertex += in_TileVertices.length();
