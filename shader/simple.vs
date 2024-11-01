@@ -32,8 +32,8 @@ void main()
 	// vec3 vBitangent = normalize(cross(vTangent, vNormal));
 
 	vec3 vTangent = normalize(cross(upVector, vNormal));
-  vec3 vBitangent = normalize(cross(vNormal, vTangent));
-  mat3 tbn = mat3(vTangent, vBitangent, vNormal);
+  	vec3 vBitangent = normalize(cross(vNormal, vTangent));
+  	mat3 tbn = mat3(vTangent, vBitangent, vNormal);
 
 	// fragNormal = normalize(tbn * vec3(-dx, -dy, 1));
 	// fragNormal = normalize(tbn * vec3(0, 0, 1));

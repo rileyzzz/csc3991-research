@@ -1,4 +1,5 @@
 #include "buffer.h"
+#include <iostream>
 
 UniformBuffer::UniformBuffer(void* data, size_t len)
 {
@@ -8,6 +9,7 @@ UniformBuffer::UniformBuffer(void* data, size_t len)
 
 UniformBuffer::~UniformBuffer()
 {
+  std::cout << "DEBUG: Delete uniform buffer " << id << "\n";
   glDeleteBuffers(1, &id);
 }
 
@@ -24,6 +26,7 @@ StorageBuffer::StorageBuffer(void* data, size_t len)
 
 StorageBuffer::~StorageBuffer()
 {
+  std::cout << "DEBUG: Delete storage buffer " << id << "\n";
   glDeleteBuffers(1, &id);
 }
 

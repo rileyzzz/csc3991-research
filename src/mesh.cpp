@@ -9,6 +9,12 @@
 
 MeshPart::MeshPart(const MeshPartData& data)
 {
+  if (data.vtx.empty() || data.idx.empty())
+  {
+    VAO = VBO = EBO = numElements = 0;
+    return;
+  }
+
   glGenVertexArrays(1, &VAO);
   glBindVertexArray(VAO);
 
@@ -296,7 +302,12 @@ void Mesh::loadFromFile(const std::string& file)
 void Mesh::draw() const
 {
   for (const MeshPart& part : m_parts)
+  {
+    if (part.numElements == 0)
+      continue;
+
     part.draw();
+  }
 }
 
 TargetMesh::TargetMesh(const std::string& file)

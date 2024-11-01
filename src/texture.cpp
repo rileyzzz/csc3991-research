@@ -13,6 +13,7 @@ Texture::Texture(const std::string& path)
 
 Texture::~Texture()
 {
+  std::cout << "DEBUG: Delete texture " << id << "\n";
   glDeleteTextures(1, &id);
 }
 
@@ -39,7 +40,8 @@ void Texture::loadFromFile(const std::string& path)
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-  glTexImage2D(GL_TEXTURE_2D, 0, nComponents == 3 ? GL_RGB : GL_RGBA, w, h, 0, nComponents == 3 ? GL_RGB : GL_RGBA, GL_UNSIGNED_BYTE, data);
+  // nComponents == 3 ? GL_RGB : 
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, nComponents == 3 ? GL_RGB : GL_RGBA, GL_UNSIGNED_BYTE, data);
   glGenerateMipmap(GL_TEXTURE_2D);
 
   glBindTexture(GL_TEXTURE_2D, 0);

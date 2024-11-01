@@ -52,6 +52,20 @@ void glfwScrollCallback(GLFWwindow* window, double xoffset, double yoffset)
   cameraDist = std::clamp(cameraDist, 1.f, 10.f);
 }
 
+
+void glDebugOutput(GLenum source,
+  GLenum type,
+  unsigned int id,
+  GLenum severity,
+  GLsizei length,
+  const char* message,
+  const void* userParam)
+{
+  if (id == 131169 || id == 131185 || id == 131218 || id == 131204) return;
+
+  std::cout << "GL DEBUG (" << id << "): " << message << "\n";
+}
+
 int main()
 {
   if (!glfwInit())
@@ -65,6 +79,11 @@ int main()
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+#if _DEBUG
+  glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, true);
+#endif // _DEBUG
+
   GLFWwindow* window = glfwCreateWindow(640, 480, "Sample", NULL, NULL);
   if (!window)
   {
@@ -82,6 +101,24 @@ int main()
     std::cout << "Failed to initialize GLAD.\n";
     return -1;
   }
+
+  // Setup debug callback.
+#if _DEBUG
+  int flags;
+  glGetIntegerv(GL_CONTEXT_FLAGS, &flags);
+  if (flags & GL_CONTEXT_FLAG_DEBUG_BIT)
+  {
+    glEnable(GL_DEBUG_OUTPUT);
+    glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+    glDebugMessageCallback(glDebugOutput, nullptr);
+    glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, nullptr, GL_TRUE);
+    std::cout << "Registered debug callback.\n";
+  }
+  else
+  {
+    std::cerr << "No debug context created!\n";
+  }
+#endif // _DEBUG
 
   // Load shaders.
   loadShaders();
