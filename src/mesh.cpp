@@ -206,7 +206,7 @@ TargetGeometryStream::TargetGeometryStream(const MeshPartData& data)
     stream[i].tangent = glm::normalize(v1.position - v0.position);
 
     // TODO: factor in area in compute shader.
-    int numTiles = 4;
+    int numTiles = 3;
 
     stream[i].tileBase = tileBase;
     stream[i].tileNum = numTiles;
@@ -256,6 +256,68 @@ void TileGeometryStreams::bind(int vertex, int index) const
 {
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, vertex, VertexStream);
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, index, IndexStream);
+}
+
+GPUMeshStreams::GPUMeshStreams(size_t maxVerts, size_t maxIndices)
+{
+  glCreateBuffers(1, &VertexStream);
+  glCreateBuffers(1, &IndexStream);
+
+
+  glNamedBufferStorage(VertexStream, 8 * sizeof(float) * maxVerts, nullptr, 0);
+  glNamedBufferStorage(IndexStream, sizeof(unsigned int) * maxIndices, nullptr, 0);
+
+  // Setup VAO.
+  glGenVertexArrays(1, &VAO);
+  glBindVertexArray(VAO);
+
+  // Bind.
+  glBindBuffer(GL_ARRAY_BUFFER, VertexStream);
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IndexStream);
+
+  size_t size;
+  size_t offset = 0;
+
+  // Setup VAO:
+  // position
+  size = 3 * sizeof(float);
+  glEnableVertexAttribArray(0);
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(MeshVertex), (void*)offset);
+  offset += size;
+
+  // padding.
+  offset += sizeof(float);
+
+  // normal
+  size = 3 * sizeof(float);
+  glEnableVertexAttribArray(1);
+  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(MeshVertex), (void*)offset);
+  offset += size;
+
+  glBindVertexArray(0);
+
+  // Unbind.
+  glBindBuffer(GL_ARRAY_BUFFER, 0);
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+}
+
+GPUMeshStreams::~GPUMeshStreams()
+{
+  glDeleteVertexArrays(1, &VAO);
+  glDeleteBuffers(1, &VertexStream);
+  glDeleteBuffers(1, &IndexStream);
+}
+
+void GPUMeshStreams::bind(int vertex, int index)
+{
+  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, vertex, VertexStream);
+  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, index, IndexStream);
+}
+
+void GPUMeshStreams::draw()
+{
+  glBindVertexArray(VAO);
+  glDrawElements(GL_TRIANGLES, 480 * 3 * 3, GL_UNSIGNED_INT, 0);
 }
 
 Mesh::Mesh(const std::string& path)

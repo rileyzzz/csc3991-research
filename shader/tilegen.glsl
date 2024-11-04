@@ -42,11 +42,20 @@ layout(std430, binding = 4) buffer outputIndexStream
     uint out_TileIndices[];
 };
 
-void projectOntoTriangle(inout Vertex v, in Triangle tri) {
+void projectOntoTriangle(inout Vertex v, in Triangle tri, int iTile) {
     vec3 bitangent = normalize(cross(tri.normal, tri.tangent));
     mat3 tangentBasis = mat3(tri.tangent, bitangent, tri.normal);
 
-    v.position = tangentBasis * v.position;
+    vec3 triCenter = (tri.p0 + tri.p1 + tri.p2) / 3.0;
+    vec3 srcpos = tri.p0;
+    if (iTile == 1) srcpos = tri.p1;
+    if (iTile == 2) srcpos = tri.p2;
+
+    srcpos = triCenter * 0.8 + srcpos * 0.2;
+
+    // v.position = srcpos + tangentBasis * (v.position + vec3(iTile, 0, 0));
+    // v.position = srcpos + (v.position * 0.1) * tangentBasis;
+    v.position = srcpos + (v.position * 0.4);
 }
 
 void main() {
@@ -60,7 +69,7 @@ void main() {
     for (int iTile = 0; iTile < in_Triangles[iTriangle].tileNum; iTile++) {
         for (int iVert = 0; iVert < in_TileVertices.length(); iVert++) {
             Vertex v = in_TileVertices[iVert];
-            projectOntoTriangle(v, in_Triangles[iTriangle]);
+            projectOntoTriangle(v, in_Triangles[iTriangle], iTile);
             out_Vertices[baseVertex + iVert] = v;
         }
 

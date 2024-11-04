@@ -29,8 +29,9 @@ static bool bDraggingMouse = false;
 static std::unique_ptr<ShaderProgram> simpleMaterial;
 static std::unique_ptr<ShaderProgram> tilegen;
 static std::unique_ptr<Texture> dispTex;
-static std::unique_ptr<StorageBuffer> outputVertices;
-static std::unique_ptr<StorageBuffer> outputIndices;
+static std::unique_ptr<GPUMeshStreams> generatedMesh;
+//static std::unique_ptr<StorageBuffer> outputVertices;
+//static std::unique_ptr<StorageBuffer> outputIndices;
 
 static std::unique_ptr<Mesh> loadMesh(const std::string& mesh);
 static std::unique_ptr<TargetMesh> loadTargetMesh(const std::string& mesh);
@@ -127,10 +128,9 @@ int main()
   auto tile = loadTileMesh("tile_sphere.obj");
   auto monkey = loadMesh("cube.obj");
 
-  const int maxVertices = 1024;
-  const int maxIndices = 3 * 1024;
-  outputVertices = std::make_unique<StorageBuffer>(nullptr, 8 * sizeof(float) * maxVertices);
-  outputIndices = std::make_unique<StorageBuffer>(nullptr, sizeof(unsigned int) * maxIndices);
+  const int maxVertices = 1024 * 16;
+  const int maxIndices = 3 * 1024 * 16;
+  generatedMesh = std::make_unique<GPUMeshStreams>(maxVertices, maxIndices);
 
   //auto monkey = loadMesh("monkey_high.obj");
 
@@ -146,8 +146,8 @@ int main()
     if (glfwWindowShouldClose(window))
       break;
 
-    float time = glfwGetTime();
-    float dt = time - lastTime;
+    double time = glfwGetTime();
+    double dt = time - lastTime;
     lastTime = time;
 
     updateCamera(window);
@@ -172,6 +172,9 @@ int main()
 
     monkey->draw();
 
+    // Render the generated mesh.
+    generatedMesh->draw();
+
     glfwSwapBuffers(window);
     glfwPollEvents();
   }
@@ -185,14 +188,17 @@ static void generateSurfaceGeometry(const TargetMesh& target, const TileMesh& ti
   target.bindGeometryStream(0);
   tile.bindGeometryStreams(1, 2);
 
-  outputVertices->bind(3);
-  outputIndices->bind(4);
+  generatedMesh->bind(3, 4);
 
   // Run the compute shader.
   int numWorkgroupsX = (target.numTriangles() + 63) / 64;
 
   tilegen->bind();
   glDispatchCompute(numWorkgroupsX, 1, 1);
+
+  // Unbind mesh streams.
+  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, 0);
+  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, 0);
 }
 
 static std::unique_ptr<Mesh> loadMesh(const std::string& mesh)
@@ -276,9 +282,9 @@ static void updateInput(GLFWwindow* window, float dt)
       lasty = my;
     }
 
-    double dx = mx - lastx;
-    double dy = my - lasty;
-    cameraOrbitRot += glm::vec3(0, -dx, -dy / 1.5f) * 10.f * dt;
+    double dx = (mx - lastx) * dt;
+    double dy = (my - lasty) * dt;
+    cameraOrbitRot += glm::vec3(0, -dx, -dy / 1.5f) * 1.f;
     cameraOrbitRot.z = std::clamp(cameraOrbitRot.z, glm::radians(-89.f), glm::radians(89.f));
 
     lastx = mx;

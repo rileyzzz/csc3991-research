@@ -133,6 +133,26 @@ public:
   TileGeometryStreams& operator=(const TileGeometryStreams&) = delete;
 };
 
+class GPUMeshStreams
+{
+protected:
+  GLuint VertexStream;
+  GLuint IndexStream;
+  GLuint VAO;
+
+public:
+  GPUMeshStreams() : VertexStream(0), IndexStream(0), VAO(0) { }
+  GPUMeshStreams(size_t maxVerts, size_t maxIndices);
+  ~GPUMeshStreams();
+
+  void bind(int vertex, int index);
+  void draw();
+
+  // delete copy constructor
+  GPUMeshStreams(const GPUMeshStreams&) = delete;
+  GPUMeshStreams& operator=(const GPUMeshStreams&) = delete;
+};
+
 class Mesh
 {
 protected:
