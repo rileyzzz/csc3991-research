@@ -186,14 +186,20 @@ int main()
 
 static void generateSurfaceGeometry(const TargetMesh& target, const TileMesh& tile)
 {
+  generatedMesh->reset();
+
   target.bindGeometryStream(0);
   tile.bindGeometryStreams(1, 2);
 
   generatedMesh->bind(3, 4);
 
-  const int threadgroupSize = 64;
+  const int threadgroupSize = 512;
   // Run the compute shader.
-  int numWorkgroupsX = (target.numTriangles() + (threadgroupSize - 1)) / threadgroupSize;
+  int numThreads = target.numTriangles() * (tile.getNumIndices() / 3);
+  int numWorkgroupsX = (numThreads + (threadgroupSize - 1)) / threadgroupSize;
+
+  //int numWorkgroupsX = tile.getNumIndices() / 3;
+  //int numWorkgroupsY = target.numTriangles();
 
   tilegen->bind();
   glDispatchCompute(numWorkgroupsX, 1, 1);

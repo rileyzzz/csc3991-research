@@ -151,6 +151,7 @@ public:
   GPUMeshStreams(size_t maxVerts, size_t maxIndices);
   ~GPUMeshStreams();
 
+  void reset();
   void bind(int vertex, int index);
   void draw(int numElements);
 

@@ -279,8 +279,8 @@ GPUMeshStreams::GPUMeshStreams(size_t maxVerts, size_t maxIndices)
   glCreateBuffers(1, &IndexStream);
 
 
-  glNamedBufferStorage(VertexStream, 8 * sizeof(float) * maxVerts, nullptr, 0);
-  glNamedBufferStorage(IndexStream, sizeof(unsigned int) * maxIndices, nullptr, 0);
+  glNamedBufferStorage(VertexStream, 8 * sizeof(float) * maxVerts + sizeof(unsigned int) * 4, nullptr, 0);
+  glNamedBufferStorage(IndexStream, sizeof(unsigned int) * maxIndices + sizeof(unsigned int) * 1, nullptr, 0);
 
   // Setup VAO.
   glGenVertexArrays(1, &VAO);
@@ -292,6 +292,9 @@ GPUMeshStreams::GPUMeshStreams(size_t maxVerts, size_t maxIndices)
 
   size_t size;
   size_t offset = 0;
+
+  // offset for atomic counter.
+  offset += sizeof(unsigned int) * 4;
 
   // Setup VAO:
   // position
@@ -323,6 +326,15 @@ GPUMeshStreams::~GPUMeshStreams()
   glDeleteBuffers(1, &IndexStream);
 }
 
+void GPUMeshStreams::reset()
+{
+  //GLuint resetAtomic = 0;
+  //glNamedBufferSubData(VertexStream, 0, 4, &resetAtomic);
+  //glNamedBufferSubData(IndexStream, 0, 4, &resetAtomic);
+  glClearNamedBufferSubData(VertexStream, GL_R8, 0, 4, GL_RED, GL_UNSIGNED_BYTE, 0);
+  glClearNamedBufferSubData(IndexStream, GL_R8, 0, 4, GL_RED, GL_UNSIGNED_BYTE, 0);
+}
+
 void GPUMeshStreams::bind(int vertex, int index)
 {
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, vertex, VertexStream);
@@ -332,7 +344,13 @@ void GPUMeshStreams::bind(int vertex, int index)
 void GPUMeshStreams::draw(int numElements)
 {
   glBindVertexArray(VAO);
-  glDrawElements(GL_TRIANGLES, numElements, GL_UNSIGNED_INT, 0);
+  // glDrawElements(GL_TRIANGLES, numElements, GL_UNSIGNED_INT, 0);
+
+  // glMemoryBarrier(GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT);
+  // glMemoryBarrier(GL_ELEMENT_ARRAY_BARRIER_BIT);
+
+  GLintptr offset = 4;
+  glDrawElements(GL_TRIANGLES, numElements, GL_UNSIGNED_INT, (void*)(offset));
 }
 
 Mesh::Mesh(const std::string& path)
