@@ -200,7 +200,7 @@ TargetGeometryStream::TargetGeometryStream(const MeshPartData& data)
     stream[i].p1 = v1.position;
     stream[i].p2 = v2.position;
 
-    glm::vec3 normal = glm::normalize(glm::cross(v2.position - v0.position, v1.position - v0.position));
+    glm::vec3 normal = glm::normalize(glm::cross(glm::normalize(v1.position - v0.position), glm::normalize(v2.position - v0.position)));
     stream[i].normal = normal;
     // TODO: This is wrong.
     stream[i].tangent = glm::normalize(v1.position - v0.position);
@@ -314,10 +314,10 @@ void GPUMeshStreams::bind(int vertex, int index)
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, index, IndexStream);
 }
 
-void GPUMeshStreams::draw()
+void GPUMeshStreams::draw(int numElements)
 {
   glBindVertexArray(VAO);
-  glDrawElements(GL_TRIANGLES, 480 * 3 * 3, GL_UNSIGNED_INT, 0);
+  glDrawElements(GL_TRIANGLES, numElements, GL_UNSIGNED_INT, 0);
 }
 
 Mesh::Mesh(const std::string& path)
@@ -450,4 +450,6 @@ void TileMesh::loadFromFile(const std::string& file)
   }
 
   tileStreams = TileGeometryStreams(partData[0]);
+  numVerts = partData[0].vtx.size();
+  numIndices = partData[0].idx.size();
 }

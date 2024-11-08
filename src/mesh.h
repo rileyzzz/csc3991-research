@@ -69,22 +69,19 @@ public:
   struct Triangle
   {
     glm::vec3 p0;
-    float padding0;
+    int tileBase;
+
     glm::vec3 p1;
-    float padding1;
+    int tileNum;
+
     glm::vec3 p2;
-    float padding2;
+    float padding0;
 
     glm::vec3 normal;
-    float padding3;
+    float padding1;
 
     glm::vec3 tangent;
-    float padding4;
-
-    int tileBase;
-    int tileNum;
-    int padding5;
-    int padding6;
+    float padding2;
   };
 
   GLuint TriangleStream;
@@ -146,7 +143,7 @@ public:
   ~GPUMeshStreams();
 
   void bind(int vertex, int index);
-  void draw();
+  void draw(int numElements);
 
   // delete copy constructor
   GPUMeshStreams(const GPUMeshStreams&) = delete;
@@ -186,6 +183,8 @@ public:
 class TileMesh
 {
 protected:
+  unsigned int numVerts;
+  unsigned int numIndices;
   TileGeometryStreams tileStreams;
 
 public:
@@ -194,6 +193,8 @@ public:
 
   void loadFromFile(const std::string& file);
 
+  inline unsigned int getNumVerts() const { return numVerts; }
+  inline unsigned int getNumIndices() const { return numIndices; }
   inline void bindGeometryStreams(int vertex, int index) const { tileStreams.bind(vertex, index); }
 };
 

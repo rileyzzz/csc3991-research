@@ -173,7 +173,8 @@ int main()
     monkey->draw();
 
     // Render the generated mesh.
-    generatedMesh->draw();
+    int numSurfaceTris = target->numTriangles();
+    generatedMesh->draw(tile->getNumIndices() * 3 * numSurfaceTris);
 
     glfwSwapBuffers(window);
     glfwPollEvents();
