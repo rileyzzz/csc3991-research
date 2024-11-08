@@ -174,7 +174,7 @@ int main()
 
     // Render the generated mesh.
     int numSurfaceTris = target->numTriangles();
-    generatedMesh->draw(tile->getNumIndices() * 3 * numSurfaceTris);
+    generatedMesh->draw(tile->getNumIndices() * 4 * numSurfaceTris);
 
     glfwSwapBuffers(window);
     glfwPollEvents();

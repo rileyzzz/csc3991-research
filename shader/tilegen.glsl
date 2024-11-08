@@ -58,6 +58,12 @@ void projectOntoTriangle(inout Vertex v, in Triangle tri, int iTile) {
     // mat3 tangentBasis = mat3(tri.tangent, tri.normal, bitangent);
     v.position.xz = v.position.xz * 0.5 + 0.5;
 
+    // Tile test.
+    v.position.xz *= 0.5;
+    if (iTile == 0) v.position.x += 0.5;
+    if (iTile == 1) v.position.z += 0.5;
+    if (iTile == 2) v.position.xz += 0.5;
+
     mat3 uvToBary = mat3(tri.uvToBary0, tri.uvToBary1, tri.uvToBary2);
 
     vec3 uvCoord = vec3(v.position.xz, 1.0);

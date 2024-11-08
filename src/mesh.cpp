@@ -221,7 +221,7 @@ TargetGeometryStream::TargetGeometryStream(const MeshPartData& data)
     // stream[i].uvToBary = uvToBary;
 
     // TODO: factor in area in compute shader.
-    int numTiles = 3;
+    int numTiles = 4;
 
     stream[i].tileBase = tileBase;
     stream[i].tileNum = numTiles;
