@@ -76,7 +76,17 @@ void projectOntoTriangle(inout Vertex v, in Triangle tri, int iTile) {
 
     v.position = finalCoord + v.position.y * tri.normal;
 
-    // vec3 triCenter = (tri.p0 + tri.p1 + tri.p2) / 3.0;
+    vec3 normalCoord = vec3(v.normal.xz, 0.0);
+    vec3 baryNormal = uvToBary * normalCoord;
+    vec3 triCenter = (tri.p0 + tri.p1 + tri.p2) / 3.0;
+
+    vec3 finalNorm = normalize(
+        (tri.p0 - triCenter) * baryNormal.x +
+        (tri.p1 - triCenter) * baryNormal.y +
+        (tri.p2 - triCenter) * baryNormal.z +
+        v.normal.y * tri.normal);
+    v.normal = finalNorm;
+
     // vec3 srcpos = tri.p0;
     // if (iTile == 1) srcpos = tri.p1;
     // if (iTile == 2) srcpos = tri.p2;
