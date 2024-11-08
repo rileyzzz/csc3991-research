@@ -128,8 +128,8 @@ int main()
   auto tile = loadTileMesh("tile_sphere.obj");
   auto monkey = loadMesh("cube.obj");
 
-  const int maxVertices = 1024 * 16;
-  const int maxIndices = 3 * 1024 * 16;
+  const int maxVertices = 1024 * 128 * 12;
+  const int maxIndices = 3 * maxVertices;
   generatedMesh = std::make_unique<GPUMeshStreams>(maxVertices, maxIndices);
 
   //auto monkey = loadMesh("monkey_high.obj");
@@ -190,8 +190,9 @@ static void generateSurfaceGeometry(const TargetMesh& target, const TileMesh& ti
 
   generatedMesh->bind(3, 4);
 
+  const int threadgroupSize = 64;
   // Run the compute shader.
-  int numWorkgroupsX = (target.numTriangles() + 63) / 64;
+  int numWorkgroupsX = (target.numTriangles() + (threadgroupSize - 1)) / threadgroupSize;
 
   tilegen->bind();
   glDispatchCompute(numWorkgroupsX, 1, 1);
