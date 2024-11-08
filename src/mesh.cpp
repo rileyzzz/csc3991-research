@@ -200,10 +200,25 @@ TargetGeometryStream::TargetGeometryStream(const MeshPartData& data)
     stream[i].p1 = v1.position;
     stream[i].p2 = v2.position;
 
+    // barycentric triangle coord to 2D uv point.
+    glm::mat3 baryToUV(
+      glm::vec3(v0.uv, 1.f),
+      glm::vec3(v1.uv, 1.f),
+      glm::vec3(v2.uv, 1.f)
+    );
+
+    glm::mat3 uvToBary = glm::inverse(baryToUV);
+
     glm::vec3 normal = glm::normalize(glm::cross(glm::normalize(v1.position - v0.position), glm::normalize(v2.position - v0.position)));
     stream[i].normal = normal;
+
     // TODO: This is wrong.
-    stream[i].tangent = glm::normalize(v1.position - v0.position);
+    //stream[i].tangent = glm::normalize(v1.position - v0.position);
+
+    stream[i].uvToBary0 = uvToBary[0];
+    stream[i].uvToBary1 = uvToBary[1];
+    stream[i].uvToBary2 = uvToBary[2];
+    // stream[i].uvToBary = uvToBary;
 
     // TODO: factor in area in compute shader.
     int numTiles = 3;

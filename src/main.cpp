@@ -125,7 +125,7 @@ int main()
   loadShaders();
 
   auto target = loadTargetMesh("cube_simple.obj");
-  auto tile = loadTileMesh("tile_sphere.obj");
+  auto tile = loadTileMesh("tile_brick.obj");
   auto monkey = loadMesh("cube.obj");
 
   const int maxVertices = 1024 * 128 * 12;
@@ -170,7 +170,7 @@ int main()
     glActiveTexture(GL_TEXTURE0);
     dispTex->bind();
 
-    monkey->draw();
+    // monkey->draw();
 
     // Render the generated mesh.
     int numSurfaceTris = target->numTriangles();

@@ -80,8 +80,17 @@ public:
     glm::vec3 normal;
     float padding1;
 
-    glm::vec3 tangent;
+    //glm::vec3 tangent;
+    //float padding2;
+
+    glm::vec3 uvToBary0;
     float padding2;
+    glm::vec3 uvToBary1;
+    float padding3;
+    glm::vec3 uvToBary2;
+    float padding4;
+
+    // glm::mat3 uvToBary;
   };
 
   GLuint TriangleStream;
