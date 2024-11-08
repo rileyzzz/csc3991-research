@@ -7,6 +7,13 @@ struct Vertex {
     vec3 normal;
 };
 
+Vertex lerpVertex(Vertex a, Vertex b, float t) {
+    Vertex v;
+    v.position = mix(a.position, b.position, t);
+    v.normal = normalize(mix(a.normal, b.normal, t));
+    return v;
+}
+
 struct Triangle {
     vec3 p0;
     int tileBase;
@@ -103,57 +110,60 @@ void projectOntoTriangle(inout Vertex v, in Triangle tri, int iTile) {
     // v.position = triCenter + v.position + iTile * tri.normal * 0.1;
 }
 
-bool planeSide(vec3 v, vec4 plane) {
-    return dot(v, plane.xyz) >= plane.w;
+float planeSide(vec3 v, vec4 plane) {
+    return dot(v, plane.xyz) - plane.w;
 }
 
 // Clip results.
 // const int CLIP_ALL_OUTSIDE = 0;
 // const int CLIP_ALL_INSIDE = 1;
+// #define SCRATCH_VERTEX_COUNT 4096
+#define SCRATCH_INDEX_COUNT 1024
 
-// int baseVertex = 0;
-// Vertex generated_Vertices[1024];
+int generated_baseVertex = 0;
+// Vertex generated_Vertices[SCRATCH_VERTEX_COUNT];
 
-// int baseIndex = 0;
-// uint generated_Indices[1024];
+int generated_baseIndex = 0;
+// uint generated_Indices[SCRATCH_INDEX_COUNT];
+int out_baseVertex;
+int out_baseIndex;
 
-// Transfer a vertex from the source buffer to the destination, or use its index if it already exists.
-// int transferVertex(int src) {
+
+// int addVertexToOutput(Vertex v) {
+//     // int idx = generated_baseVertex++;
+//     // generated_Vertices[idx] = v;
+//     // return idx;
+
+//     int idx = generated_baseVertex++;
+//     out_Vertices[out_baseVertex + idx] = v;
+//     return idx;
 // }
 
-// int outputVertex(Vertex v) {
-//     generated_Vertices[baseVertex++] = v;
+// void outputIndex(uint i) {
+//     generated_Indices[generated_baseIndex++] = i;
 // }
 
-// void outputIndex(int i) {
-//     generated_Indices[baseIndex++] = i;
-//     generated_VertexUsed[i] = true;
-// }
 
-// void clearVertexUsed() {
-//     for (int i = 0; i < generated_VertexUsed.length(); i++)
-//         generated_VertexUsed[i] = false;
-// }
+// void clipMeshToPlane(uint[SCRATCH_INDEX_COUNT] indices, uint numIndices, vec4 plane) {
+//     for (int i = 0; i < numIndices; i += 3) {
+//         uint origIndex[3];
+//         origIndex[0] = indices[i + 0];
+//         origIndex[1] = indices[i + 1];
+//         origIndex[2] = indices[i + 2];
 
-// void clipTileTriangleToPlane(inout int v0, inout int v1, inout int v2, out int v3, vec4 plane) {
-//     v3 = 0;
-// }
-
-// void clipMeshToPlane(Vertex[] vertices, uint[] indices, vec4 plane) {
-//     for (int i = 0; i < indices.length(); i += 3) {
-//         uint i0 = indices[i + 0];
-//         uint i1 = indices[i + 1];
-//         uint i2 = indices[i + 2];
-
-//         Vertex v0 = vertices[i0];
-//         Vertex v1 = vertices[i1];
-//         Vertex v2 = vertices[i2];
+//         Vertex v[3];
+//         v[0] = out_Vertices[origIndex[0]];
+//         v[1] = out_Vertices[origIndex[1]];
+//         v[2] = out_Vertices[origIndex[2]];
         
-//         bool v0Inside = planeSide(v0.position, plane);
-//         bool v1Inside = planeSide(v1.position, plane);
-//         bool v2Inside = planeSide(v2.position, plane);
-
-//         int nInside = int(v0Inside) + int(v1Inside) + int(v2Inside);
+//         int nInside = 0;
+//         float dist[3];
+//         for (int i = 0; i < 3; i++)
+//         {
+//             dist[i] = planeSide(v[i].position, plane);
+//             if (dist[i] <= 0.0)
+//                 nInside++;
+//         }
 
 //         // Simple cases.
 //         if (nInside == 0)
@@ -165,18 +175,39 @@ bool planeSide(vec3 v, vec4 plane) {
 //         if (nInside == 3)
 //         {
 //             // All inside. Transfer geometry.
-//             i0 = transferVertex(i0);
-//             i1 = transferVertex(i1);
-//             i2 = transferVertex(i2);
-
-//             outputIndex(i0);
-//             outputIndex(i1);
-//             outputIndex(i2);
+//             outputIndex(origIndex[0]);
+//             outputIndex(origIndex[1]);
+//             outputIndex(origIndex[2]);
+//             continue;
 //         }
         
 //         if (nInside == 1)
 //         {
 //             // Triangle-triangle case.
+//             /*
+//             int insideVert;
+//             for (insideVert = 0; i < 3; i++)
+//             {
+//                 if (inside[insideVert])
+//                     break;
+//             }
+
+//             float split = -dist[insideVert];
+
+//             int outside0 = (insideVert + 1) % 3;
+//             int outside1 = (insideVert + 2) % 3;
+
+//             // Create two new vertices.
+//             Vertex p0 = lerpVertex(v[insideVert], v[outside0], split / (split + dist[outside0]));
+//             Vertex p1 = lerpVertex(v[insideVert], v[outside1], split / (split + dist[outside1]));
+
+//             int i0 = outputVertex(p0);
+//             int i1 = outputVertex(p1);
+
+//             outputIndex(origIndex[insideVert]);
+//             outputIndex(i0);
+//             outputIndex(i1);
+//             */
 //         }
 //         else // (nInside == 2)
 //         {
@@ -190,44 +221,57 @@ void main() {
     if (iTriangle > in_Triangles.length())
         return;
     
-    int baseVertex = in_Triangles[iTriangle].tileBase * in_TileVertices.length();
-    int baseIndex = in_Triangles[iTriangle].tileBase * in_TileIndices.length();
+    int out_baseVertex = in_Triangles[iTriangle].tileBase * in_TileVertices.length();
+    int out_baseIndex = in_Triangles[iTriangle].tileBase * in_TileIndices.length();
 
     for (int iTile = 0; iTile < in_Triangles[iTriangle].tileNum; iTile++) {
+        
         for (int iVert = 0; iVert < in_TileVertices.length(); iVert++) {
             Vertex v = in_TileVertices[iVert];
             projectOntoTriangle(v, in_Triangles[iTriangle], iTile);
-            out_Vertices[baseVertex + iVert] = v;
+            out_Vertices[out_baseVertex + iVert] = v;
         }
 
         for (int iIndex = 0; iIndex < in_TileIndices.length(); iIndex++) {
-            out_TileIndices[baseIndex + iIndex] = baseVertex + in_TileIndices[iIndex];
+            out_TileIndices[out_baseIndex + iIndex] = out_baseVertex + in_TileIndices[iIndex];
         }
+
+        out_baseVertex += in_TileVertices.length();
+        out_baseIndex += in_TileIndices.length();
+        
+
 
         // Step 1: Push the transformed tile geometry.
         /*
-        baseVertex = 0;
-        baseIndex = 0;
-        clearVertexUsed();
-
+        generated_baseVertex = 0;
+        generated_baseIndex = 0;
         for (int iVert = 0; iVert < in_TileVertices.length(); iVert++) {
             Vertex v = in_TileVertices[iVert];
             projectOntoTriangle(v, in_Triangles[iTriangle], iTile);
-            outputVertex(v);
+            addVertexToOutput(v);
         }
 
-        for (int iIndex = 0; iIndex < in_TileIndices.length(); iIndex++) {
+        // Step 2: Clip the index stream to the triangle boundary, adding vertices where needed.
+        for (int iIndex = 0; iIndex < in_TileIndices.length() ; iIndex++) {
             outputIndex(in_TileIndices[iIndex]);
         }
 
-        // Step 2: Clip geometry to target edges.
-        for (int iPlane = 0; iPlane < 3; iPlane++) {
-            int clipResult = clipTileTriangleToPlane(v0, v1, v2, v3);
+        
+        // vec4 plane = vec4(0, 1, 0, 0);
+        // clipMeshToPlane()
 
+        // for (int iPlane = 0; iPlane < 3; iPlane++) {
+        //     int clipResult = clipTileTriangleToPlane(v0, v1, v2, v3);
+        // }
+
+        // Step 3: Output clipped geometry.
+        for (int iIndex = 0; iIndex < generated_baseIndex; iIndex++) {
+            out_TileIndices[out_baseIndex + iIndex] = out_baseVertex + generated_Indices[iIndex];
         }
-        */
 
-        baseVertex += in_TileVertices.length();
-        baseIndex += in_TileIndices.length();
+        out_baseVertex += generated_baseVertex;
+        out_baseIndex += generated_baseIndex;
+        */
+    
     }
 }
