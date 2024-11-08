@@ -298,6 +298,9 @@ static void updateCamera(GLFWwindow* window)
 {
   int w, h;
   glfwGetWindowSize(window, &w, &h);
+  if (w == 0 || h == 0)
+    return;
+
   glViewport(0, 0, w, h);
 
   float aspect = (float)w / (float)h;
