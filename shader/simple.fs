@@ -17,6 +17,7 @@ void main()
 
   float ambientStrength = 0.2;
   float specularStrength = 0.8;
+  float specPower = 32.0;
 
   vec3 vecToLight = normalize(lightPos - fragPos.xyz);
   vec3 vecToView = normalize(viewPos - fragPos.xyz);
@@ -27,7 +28,7 @@ void main()
   vec3 diffuse = diff * lightColor;
 
   vec3 reflectDir = reflect(-vecToLight, fragNormal); 
-  float spec = pow(max(dot(vecToView, reflectDir), 0.0), 32);
+  float spec = pow(max(dot(vecToView, reflectDir), 0.0), specPower);
   vec3 specular = specularStrength * spec * lightColor;  
 
   // objectColor = texture(displacement, texCoord).rgb;
