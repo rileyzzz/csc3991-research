@@ -125,6 +125,8 @@ int main()
   loadShaders();
 
   auto target = loadTargetMesh("cube_simple.obj");
+  //auto target = loadTargetMesh("test_ico.obj");
+  //auto target = loadTargetMesh("test_torus.obj");
   auto tile = loadTileMesh("tile_brick.obj");
   auto monkey = loadMesh("cube.obj");
 
