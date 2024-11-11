@@ -346,8 +346,8 @@ void GPUMeshStreams::draw(int numElements)
   glBindVertexArray(VAO);
   // glDrawElements(GL_TRIANGLES, numElements, GL_UNSIGNED_INT, 0);
 
-  // glMemoryBarrier(GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT);
-  // glMemoryBarrier(GL_ELEMENT_ARRAY_BARRIER_BIT);
+   glMemoryBarrier(GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT);
+   glMemoryBarrier(GL_ELEMENT_ARRAY_BARRIER_BIT);
 
   GLintptr offset = 4;
   glDrawElements(GL_TRIANGLES, numElements, GL_UNSIGNED_INT, (void*)(offset));
