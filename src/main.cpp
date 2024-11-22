@@ -40,12 +40,15 @@ static std::unique_ptr<GPUMeshStreams> generatedMesh;
 //static std::unique_ptr<StorageBuffer> outputIndices;
 
 static bool s_bDrawWireframe = false;
+static bool s_bDrawTessellatedMesh = true;
+static bool s_bComputeReferenceImplementation = false;
+static bool s_bDrawReferenceImplementation = false;
 
 static std::unique_ptr<Mesh> loadMesh(const std::string& mesh);
 static std::unique_ptr<TargetMesh> loadTargetMesh(const std::string& mesh);
 static std::unique_ptr<TileMesh> loadTileMesh(const std::string& mesh);
 static void loadShaders(void);
-static void drawUI(GLFWwindow* window);
+static void drawUI(GLFWwindow* window, double dt);
 static void updateInput(GLFWwindow* window, float dt);
 static void updateCamera(GLFWwindow* window);
 
@@ -176,7 +179,7 @@ int main()
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
-    drawUI(window);
+    drawUI(window, dt);
 
     updateCamera(window);
     updateInput(window, dt);
@@ -194,27 +197,40 @@ int main()
     }
 
     // Compute phase.
-    //generateSurfaceGeometry(*target, *tile);
+    if (s_bComputeReferenceImplementation)
+    {
+      generateSurfaceGeometry(*target, *tile);
+    }
 
     subdivMaterial->bind();
 
     // Set uniforms.
     glUniformMatrix4fv(subdivMaterial->getUniformLocation("viewProj"), 1, GL_FALSE, glm::value_ptr(viewProj));
     glUniform3fv(subdivMaterial->getUniformLocation("viewPos"), 1, glm::value_ptr(cameraPos));
-    
-    //glUniform1i(simpleMaterial->getUniformLocation("displacement"), 0);
 
     glActiveTexture(GL_TEXTURE0);
     dispTex->bind();
 
-    // monkey->draw();
+    if (s_bDrawTessellatedMesh)
+    {
+      monkey->drawPatches();
+    }
 
+    simpleMaterial->bind();
 
-    monkey->drawPatches();
+    // Set uniforms.
+    glUniformMatrix4fv(simpleMaterial->getUniformLocation("viewProj"), 1, GL_FALSE, glm::value_ptr(viewProj));
+    glUniform3fv(simpleMaterial->getUniformLocation("viewPos"), 1, glm::value_ptr(cameraPos));
+
+    glActiveTexture(GL_TEXTURE0);
+    dispTex->bind();
 
     // Render the generated mesh.
-    int numSurfaceTris = target->numTriangles();
-    //generatedMesh->draw(tile->getNumIndices() * 4 * numSurfaceTris);
+    if (s_bDrawReferenceImplementation)
+    {
+      int numSurfaceTris = target->numTriangles();
+      generatedMesh->draw(tile->getNumIndices() * 4 * numSurfaceTris);
+    }
 
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
@@ -313,7 +329,7 @@ static void loadShaders(void)
 
 }
 
-static void drawUI(GLFWwindow* window)
+static void drawUI(GLFWwindow* window, double dt)
 {
   int w, h;
   glfwGetWindowSize(window, &w, &h);
@@ -325,11 +341,20 @@ static void drawUI(GLFWwindow* window)
 
   ImGui::Begin("Debug", NULL, 0);
 
+  char fpsStr[32];
+  //snprintf(fpsStr, sizeof(fpsStr), "FPS %f", 1.0 / dt);
+  snprintf(fpsStr, sizeof(fpsStr), "frame: %.2f ms", dt * 1000);
+  ImGui::Text(fpsStr);
+
   ImGui::Text("Rendering:");
   ImGui::BeginGroup();
   ImGui::Checkbox("Wireframe", &s_bDrawWireframe);
+  ImGui::Checkbox("Draw Tessellated Mesh", &s_bDrawTessellatedMesh);
+  ImGui::Checkbox("Compute Reference Implementation", &s_bComputeReferenceImplementation);
+  ImGui::Checkbox("Draw Reference Implementation", &s_bDrawReferenceImplementation);
   ImGui::EndGroup();
 
+  
   ImGui::End();
 }
 
