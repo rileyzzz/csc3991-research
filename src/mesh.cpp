@@ -81,6 +81,12 @@ void MeshPart::draw() const
   glDrawElements(GL_TRIANGLES, numElements, GL_UNSIGNED_INT, 0);
 }
 
+void MeshPart::drawPatches() const
+{
+  glPatchParameteri(GL_PATCH_VERTICES, 3);
+  glBindVertexArray(VAO);
+  glDrawElements(GL_PATCHES, numElements, GL_UNSIGNED_INT, 0);
+}
 
 static void loadParts(tinyobj::ObjReader& reader, std::vector<MeshPartData>& partData, bool ignoreMaterials = false)
 {
@@ -402,6 +408,17 @@ void Mesh::draw() const
       continue;
 
     part.draw();
+  }
+}
+
+void Mesh::drawPatches() const
+{
+  for (const MeshPart& part : m_parts)
+  {
+    if (part.numElements == 0)
+      continue;
+
+    part.drawPatches();
   }
 }
 

@@ -1,0 +1,49 @@
+#version 410 core
+
+layout (triangles, fractional_odd_spacing, ccw) in;
+
+uniform sampler2D displacement;
+uniform mat4 viewProj;
+
+// in vec4 tess_fragPos[];
+in vec3 tess_fragNormal[];
+in vec2 tess_texCoord[];
+
+out vec4 fragPos;
+out vec3 fragNormal;
+out vec2 texCoord;
+
+
+void main()
+{
+    float u = gl_TessCoord.x;
+    float v = gl_TessCoord.y;
+    float w = gl_TessCoord.z;
+
+    vec2 t0 = tess_texCoord[0];
+    vec2 t1 = tess_texCoord[1];
+    vec2 t2 = tess_texCoord[2];
+    texCoord = t0 * u + t1 * v + t2 * w;
+
+    float heightStrength = 0.1;
+    float height = texture(displacement, texCoord).r * heightStrength;
+
+    vec4 p0 = gl_in[0].gl_Position;
+    vec4 p1 = gl_in[1].gl_Position;
+    vec4 p2 = gl_in[2].gl_Position;
+
+    vec3 n0 = tess_fragNormal[0];
+    vec3 n1 = tess_fragNormal[1];
+    vec3 n2 = tess_fragNormal[2];
+
+    vec3 normal = normalize(n0 * u + n1 * v + n2 * w);
+    fragNormal = normal.xyz;
+
+    vec4 p = p0 * u + p1 * v + p2 * w;
+
+    p.xyz += normal.xyz * height;
+
+    fragPos = p;
+    gl_Position = viewProj * p;
+}
+	

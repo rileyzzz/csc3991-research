@@ -61,6 +61,7 @@ public:
   MeshPart& operator=(const MeshPart&) = delete;
 
   void draw() const;
+  void drawPatches() const;
 };
 
 class TargetGeometryStream
@@ -173,6 +174,7 @@ public:
   void loadFromFile(const std::string& file);
 
   void draw() const;
+  void drawPatches() const;
 };
 
 class TargetMesh

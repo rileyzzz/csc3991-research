@@ -27,6 +27,7 @@ static glm::vec3 cameraRight;
 static bool bDraggingMouse = false;
 
 static std::unique_ptr<ShaderProgram> simpleMaterial;
+static std::unique_ptr<ShaderProgram> subdivMaterial;
 static std::unique_ptr<ShaderProgram> tilegen;
 static std::unique_ptr<Texture> dispTex;
 static std::unique_ptr<GPUMeshStreams> generatedMesh;
@@ -128,7 +129,8 @@ int main()
   //auto target = loadTargetMesh("test_ico.obj");
   //auto target = loadTargetMesh("test_torus.obj");
   auto tile = loadTileMesh("tile_brick.obj");
-  auto monkey = loadMesh("cube.obj");
+  //auto monkey = loadMesh("cube.obj");
+  auto monkey = loadMesh("cube_simple.obj");
 
   const int maxVertices = 1024 * 128 * 12;
   const int maxIndices = 3 * maxVertices;
@@ -159,13 +161,13 @@ int main()
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     // Compute phase.
-    generateSurfaceGeometry(*target, *tile);
+    //generateSurfaceGeometry(*target, *tile);
 
-    simpleMaterial->bind();
+    subdivMaterial->bind();
 
     // Set uniforms.
-    glUniformMatrix4fv(simpleMaterial->getUniformLocation("viewProj"), 1, GL_FALSE, glm::value_ptr(viewProj));
-    glUniform3fv(simpleMaterial->getUniformLocation("viewPos"), 1, glm::value_ptr(cameraPos));
+    glUniformMatrix4fv(subdivMaterial->getUniformLocation("viewProj"), 1, GL_FALSE, glm::value_ptr(viewProj));
+    glUniform3fv(subdivMaterial->getUniformLocation("viewPos"), 1, glm::value_ptr(cameraPos));
     
     //glUniform1i(simpleMaterial->getUniformLocation("displacement"), 0);
 
@@ -174,9 +176,14 @@ int main()
 
     // monkey->draw();
 
+
+    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    monkey->drawPatches();
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
     // Render the generated mesh.
     int numSurfaceTris = target->numTriangles();
-    generatedMesh->draw(tile->getNumIndices() * 4 * numSurfaceTris);
+    //generatedMesh->draw(tile->getNumIndices() * 4 * numSurfaceTris);
 
     glfwSwapBuffers(window);
     glfwPollEvents();
@@ -235,12 +242,23 @@ static void loadShaders(void)
     std::filesystem::path vertPath = std::filesystem::path(SHADERS_DIR) / "simple.vs";
     std::filesystem::path fragPath = std::filesystem::path(SHADERS_DIR) / "simple.fs";
 
+    std::filesystem::path subdivVertPath = std::filesystem::path(SHADERS_DIR) / "subdiv.vs";
+    std::filesystem::path tcsPath = std::filesystem::path(SHADERS_DIR) / "subdiv.tcs";
+    std::filesystem::path tevPath = std::filesystem::path(SHADERS_DIR) / "subdiv.tev";
+
     // these are destructed when the function exits.
     Shader vert(GL_VERTEX_SHADER, vertPath.string());
     Shader frag(GL_FRAGMENT_SHADER, fragPath.string());
 
     std::vector<Shader*> progs = { &vert, &frag };
     simpleMaterial = std::make_unique<ShaderProgram>(progs);
+
+    Shader subdivVert(GL_VERTEX_SHADER, subdivVertPath.string());
+    Shader tcs(GL_TESS_CONTROL_SHADER, tcsPath.string());
+    Shader tev(GL_TESS_EVALUATION_SHADER, tevPath.string());
+
+    progs = { &subdivVert, &tcs, &tev, &frag };
+    subdivMaterial = std::make_unique<ShaderProgram>(progs);
   }
 
   {

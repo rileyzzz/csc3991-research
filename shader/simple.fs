@@ -7,7 +7,7 @@ in vec2 texCoord;
 out vec4 FragColor;
 
 uniform vec3 viewPos;
-// uniform sampler2D displacement;
+uniform sampler2D displacement;
 
 void main()
 {
@@ -31,7 +31,7 @@ void main()
   float spec = pow(max(dot(vecToView, reflectDir), 0.0), specPower);
   vec3 specular = specularStrength * spec * lightColor;  
 
-  // objectColor = texture(displacement, texCoord).rgb;
+  objectColor = texture(displacement, texCoord).rgb;
   
   vec3 result = (ambient + diffuse + specular) * objectColor;
 
