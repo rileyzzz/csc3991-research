@@ -13,6 +13,11 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/euler_angles.hpp>
 
+// ImGUI.
+#include "imgui.h"
+#include "backends/imgui_impl_glfw.h"
+#include "backends/imgui_impl_opengl3.h"
+
 static glm::mat4 proj;
 static glm::mat4 view;
 static glm::mat4 viewProj;
@@ -34,10 +39,13 @@ static std::unique_ptr<GPUMeshStreams> generatedMesh;
 //static std::unique_ptr<StorageBuffer> outputVertices;
 //static std::unique_ptr<StorageBuffer> outputIndices;
 
+static bool s_bDrawWireframe = false;
+
 static std::unique_ptr<Mesh> loadMesh(const std::string& mesh);
 static std::unique_ptr<TargetMesh> loadTargetMesh(const std::string& mesh);
 static std::unique_ptr<TileMesh> loadTileMesh(const std::string& mesh);
 static void loadShaders(void);
+static void drawUI(GLFWwindow* window);
 static void updateInput(GLFWwindow* window, float dt);
 static void updateCamera(GLFWwindow* window);
 
@@ -122,6 +130,16 @@ int main()
   }
 #endif // _DEBUG
 
+  IMGUI_CHECKVERSION();
+  if (!ImGui::CreateContext())
+  {
+    std::cerr << "Failed to create Dear ImGui context!\n";
+    return -1;
+  }
+
+  ImGui_ImplGlfw_InitForOpenGL(window, true);
+  ImGui_ImplOpenGL3_Init();
+
   // Load shaders.
   loadShaders();
 
@@ -154,11 +172,26 @@ int main()
     double dt = time - lastTime;
     lastTime = time;
 
+    // UI
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+    drawUI(window);
+
     updateCamera(window);
     updateInput(window, dt);
 
     glClearColor(0.3f, 0.3f, 0.3f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    if (s_bDrawWireframe)
+    {
+      glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    }
+    else
+    {
+      glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    }
 
     // Compute phase.
     //generateSurfaceGeometry(*target, *tile);
@@ -177,17 +210,24 @@ int main()
     // monkey->draw();
 
 
-    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     monkey->drawPatches();
-    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
     // Render the generated mesh.
     int numSurfaceTris = target->numTriangles();
     //generatedMesh->draw(tile->getNumIndices() * 4 * numSurfaceTris);
 
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+    ImGui::Render();
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
     glfwSwapBuffers(window);
     glfwPollEvents();
   }
+
+  ImGui_ImplOpenGL3_Shutdown();
+  ImGui_ImplGlfw_Shutdown();
+  ImGui::DestroyContext();
 
   glfwDestroyWindow(window);
   glfwTerminate();
@@ -271,6 +311,26 @@ static void loadShaders(void)
     tilegen = std::make_unique<ShaderProgram>(progs);
   }
 
+}
+
+static void drawUI(GLFWwindow* window)
+{
+  int w, h;
+  glfwGetWindowSize(window, &w, &h);
+  if (w == 0 || h == 0)
+    return;
+
+  ImGui::SetNextWindowPos(ImVec2(0, 0));
+  ImGui::SetNextWindowSize(ImVec2(200, h));
+
+  ImGui::Begin("Debug", NULL, 0);
+
+  ImGui::Text("Rendering:");
+  ImGui::BeginGroup();
+  ImGui::Checkbox("Wireframe", &s_bDrawWireframe);
+  ImGui::EndGroup();
+
+  ImGui::End();
 }
 
 static void updateInput(GLFWwindow* window, float dt)
