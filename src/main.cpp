@@ -40,10 +40,29 @@ enum class ClippingMode
   Max
 };
 
-static std::unique_ptr<ShaderProgram> tilegen[(int)ClippingMode::Max];
-std::unique_ptr<ShaderProgram>& getTilegenShader(ClippingMode clip)
+enum class ThreadgroupSize : int
 {
-  return tilegen[(int)clip];
+  Threads_64,
+  Threads_128,
+  Threads_256,
+  Threads_512,
+
+  Max
+};
+
+static GLuint getThreadgroupSize(ThreadgroupSize size)
+{
+  if (size == ThreadgroupSize::Threads_64) return 64;
+  if (size == ThreadgroupSize::Threads_128) return 128;
+  if (size == ThreadgroupSize::Threads_256) return 256;
+  if (size == ThreadgroupSize::Threads_512) return 512;
+  return 0;
+}
+
+static std::unique_ptr<ShaderProgram> tilegen[(int)ClippingMode::Max][(int)ThreadgroupSize::Max];
+static std::unique_ptr<ShaderProgram>& getTilegenShader(ClippingMode clip, ThreadgroupSize threads)
+{
+  return tilegen[(int)clip][(int)threads];
 }
 
 static std::unique_ptr<ShaderProgram> simpleMaterial;
@@ -57,6 +76,7 @@ static bool s_bDrawWireframe = false;
 static bool s_bDrawTessellatedMesh = true;
 static bool s_bComputeReferenceImplementation = false;
 static bool s_bEnableClipping = true;
+static ThreadgroupSize s_threadgroupSize = ThreadgroupSize::Threads_256;
 static bool s_bDrawReferenceImplementation = false;
 static int s_nTrianglesOnScreen = 0;
 
@@ -343,7 +363,7 @@ static void generateSurfaceGeometry(const TargetMesh& target, const TileMesh& ti
 
   generatedMesh->bind(3, 4);
 
-  const int threadgroupSize = 512;
+  const int threadgroupSize = getThreadgroupSize(s_threadgroupSize);
   // Run the compute shader.
   int numThreads = target.numTriangles() * (tile.getNumIndices() / 3);
   int numWorkgroupsX = (numThreads + (threadgroupSize - 1)) / threadgroupSize;
@@ -351,7 +371,7 @@ static void generateSurfaceGeometry(const TargetMesh& target, const TileMesh& ti
   //int numWorkgroupsX = tile.getNumIndices() / 3;
   //int numWorkgroupsY = target.numTriangles();
 
-  getTilegenShader(s_bEnableClipping ? ClippingMode::On : ClippingMode::Off)->bind();
+  getTilegenShader(s_bEnableClipping ? ClippingMode::On : ClippingMode::Off, s_threadgroupSize)->bind();
 
   glDispatchCompute(numWorkgroupsX, 1, 1);
 
@@ -403,19 +423,21 @@ static void loadShaders(void)
     subdivMaterial = std::make_unique<ShaderProgram>(progs);
   }
 
+  for (int threadgroupSizeEnum = 0; threadgroupSizeEnum < (int)ThreadgroupSize::Max; threadgroupSizeEnum++)
   for (int clipMode = 0; clipMode < (int)ClippingMode::Max; clipMode++)
   {
     std::filesystem::path csPath = std::filesystem::path(SHADERS_DIR) / "tilegen.glsl";
 
     Shader::DefinesList defines;
 
+    defines.push_back({ "TILE_THREADGROUPS_X", std::to_string(getThreadgroupSize((ThreadgroupSize)threadgroupSizeEnum))});
     defines.push_back({ "ENABLE_CLIPPING", clipMode == 1 ? "1" : "0" });
 
     // these are destructed when the function exits.
     Shader computeProg(GL_COMPUTE_SHADER, csPath.string(), defines);
 
     std::vector<Shader*> progs = { &computeProg };
-    getTilegenShader((ClippingMode)clipMode) = std::make_unique<ShaderProgram>(progs);
+    getTilegenShader((ClippingMode)clipMode, (ThreadgroupSize)threadgroupSizeEnum) = std::make_unique<ShaderProgram>(progs);
   }
 
 }
@@ -455,6 +477,7 @@ static void drawUI(GLFWwindow* window, double dt)
   ImGui::Checkbox("Compute Reference Implementation", &s_bComputeReferenceImplementation);
   ImGui::BeginGroup();
   ImGui::Checkbox("Enable Clipping", &s_bEnableClipping);
+  ImGui::Combo("Threadgroup Size", (int*)&s_threadgroupSize, "64\000128\000256\000512\0\0");
   ImGui::EndGroup();
 
   ImGui::Checkbox("Draw Reference Implementation", &s_bDrawReferenceImplementation);
