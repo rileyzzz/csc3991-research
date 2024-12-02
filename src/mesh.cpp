@@ -347,13 +347,20 @@ void GPUMeshStreams::bind(int vertex, int index)
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, index, IndexStream);
 }
 
+GLuint GPUMeshStreams::getNumGeneratedElements()
+{
+  glMemoryBarrier(GL_ATOMIC_COUNTER_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
+  GLuint numElements = 0;
+  glGetNamedBufferSubData(IndexStream, 0, sizeof(GLuint), &numElements);
+  return numElements;
+}
+
 void GPUMeshStreams::draw(int numElements)
 {
   glBindVertexArray(VAO);
   // glDrawElements(GL_TRIANGLES, numElements, GL_UNSIGNED_INT, 0);
 
-   glMemoryBarrier(GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT);
-   glMemoryBarrier(GL_ELEMENT_ARRAY_BARRIER_BIT);
+   glMemoryBarrier(GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT | GL_ELEMENT_ARRAY_BARRIER_BIT);
 
   GLintptr offset = 4;
   glDrawElements(GL_TRIANGLES, numElements, GL_UNSIGNED_INT, (void*)(offset));

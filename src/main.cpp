@@ -17,6 +17,7 @@
 #include "imgui.h"
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_opengl3.h"
+#include "implot.h"
 
 static glm::mat4 proj;
 static glm::mat4 view;
@@ -43,6 +44,21 @@ static bool s_bDrawWireframe = false;
 static bool s_bDrawTessellatedMesh = true;
 static bool s_bComputeReferenceImplementation = false;
 static bool s_bDrawReferenceImplementation = false;
+static int s_nTrianglesOnScreen = 0;
+
+enum GLQuery
+{
+  ComputeTime,
+  TessellationTriangles,
+  TessellationRenderTime,
+  TilemeshRenderTime,
+
+  Max
+};
+static GLuint s_glQueries[(int)GLQuery::Max] = { 0 };
+
+#define FRAMETIME_WINDOW 1024
+static double s_frameTimes[FRAMETIME_WINDOW] = { 0 };
 
 static std::unique_ptr<Mesh> loadMesh(const std::string& mesh);
 static std::unique_ptr<TargetMesh> loadTargetMesh(const std::string& mesh);
@@ -140,6 +156,12 @@ int main()
     return -1;
   }
 
+  if (!ImPlot::CreateContext())
+  {
+    std::cerr << "Failed to create ImPlot context!\n";
+    return -1;
+  }
+
   ImGui_ImplGlfw_InitForOpenGL(window, true);
   ImGui_ImplOpenGL3_Init();
 
@@ -163,6 +185,8 @@ int main()
 
   // Setup.
   glEnable(GL_DEPTH_TEST);
+
+  glGenQueries((int)GLQuery::Max, s_glQueries);
 
   // Main loop.
   double lastTime = glfwGetTime();
@@ -197,10 +221,12 @@ int main()
     }
 
     // Compute phase.
+    glBeginQuery(GL_TIME_ELAPSED, s_glQueries[(int)GLQuery::ComputeTime]);
     if (s_bComputeReferenceImplementation)
     {
       generateSurfaceGeometry(*target, *tile);
     }
+    glEndQuery(GL_TIME_ELAPSED);
 
     subdivMaterial->bind();
 
@@ -211,10 +237,14 @@ int main()
     glActiveTexture(GL_TEXTURE0);
     dispTex->bind();
 
+    glBeginQuery(GL_TIME_ELAPSED, s_glQueries[(int)GLQuery::TessellationRenderTime]);
+    glBeginQuery(GL_PRIMITIVES_GENERATED, s_glQueries[(int)GLQuery::TessellationTriangles]);
     if (s_bDrawTessellatedMesh)
     {
       monkey->drawPatches();
     }
+    glEndQuery(GL_TIME_ELAPSED);
+    glEndQuery(GL_PRIMITIVES_GENERATED);
 
     simpleMaterial->bind();
 
@@ -226,23 +256,68 @@ int main()
     dispTex->bind();
 
     // Render the generated mesh.
+    glBeginQuery(GL_TIME_ELAPSED, s_glQueries[(int)GLQuery::TilemeshRenderTime]);
     if (s_bDrawReferenceImplementation)
     {
       int numSurfaceTris = target->numTriangles();
-      generatedMesh->draw(tile->getNumIndices() * 4 * numSurfaceTris);
+      int maxSurfaceIndices = tile->getNumIndices() * 4 * numSurfaceTris;
+
+      // TODO: send this indirectly!
+      generatedMesh->draw(maxSurfaceIndices);
+      // generatedMesh->draw(generatedMesh->getNumGeneratedElements());
     }
+    glEndQuery(GL_TIME_ELAPSED);
 
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
+
+    // Frame analysis.
+    /*
+    s_nTrianglesOnScreen = 0;
+    if (s_bDrawReferenceImplementation)
+    {
+      s_nTrianglesOnScreen += generatedMesh->getNumGeneratedElements() / 3;
+    }
+    if (s_bDrawTessellatedMesh)
+    {
+      // TODO: factor tesselation values.
+      s_nTrianglesOnScreen += (monkey->getTotalElements() / 3);
+    }
+    */
+
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+    // Analyze framedata.
+    GLuint64 computeTime = 0;
+    GLuint64 tesselationTris = 0;
+    GLuint64 tesselationRenderTime = 0;
+    GLuint64 tilemeshRenderTime = 0;
+    glGetQueryObjectui64v(s_glQueries[(int)GLQuery::ComputeTime], GL_QUERY_RESULT, &computeTime);
+    glGetQueryObjectui64v(s_glQueries[(int)GLQuery::TessellationTriangles], GL_QUERY_RESULT, &tesselationTris);
+    glGetQueryObjectui64v(s_glQueries[(int)GLQuery::TessellationRenderTime], GL_QUERY_RESULT, &tesselationRenderTime);
+    glGetQueryObjectui64v(s_glQueries[(int)GLQuery::TilemeshRenderTime], GL_QUERY_RESULT, &tilemeshRenderTime);
+
+
+    GLuint64 totalTime = computeTime + tesselationRenderTime + tilemeshRenderTime;
+
+    // Shift frametime over.
+    for (int i = 0; i < IM_ARRAYSIZE(s_frameTimes) - 1; i++)
+      s_frameTimes[i] = s_frameTimes[i + 1];
+
+    // Nanoseconds to seconds.
+    s_frameTimes[IM_ARRAYSIZE(s_frameTimes) - 1] = (double)totalTime * 1e-9;
 
     glfwSwapBuffers(window);
     glfwPollEvents();
   }
 
+  glDeleteQueries((int)GLQuery::Max, s_glQueries);
+
   ImGui_ImplOpenGL3_Shutdown();
   ImGui_ImplGlfw_Shutdown();
+
+  ImPlot::DestroyContext();
   ImGui::DestroyContext();
 
   glfwDestroyWindow(window);
@@ -337,13 +412,21 @@ static void drawUI(GLFWwindow* window, double dt)
     return;
 
   ImGui::SetNextWindowPos(ImVec2(0, 0));
-  ImGui::SetNextWindowSize(ImVec2(200, h));
+  ImGui::SetNextWindowSizeConstraints(ImVec2(20, h), ImVec2(w / 2, h));
 
   ImGui::Begin("Debug", NULL, 0);
 
-  char fpsStr[32];
+  char fpsStr[64];
   //snprintf(fpsStr, sizeof(fpsStr), "FPS %f", 1.0 / dt);
-  snprintf(fpsStr, sizeof(fpsStr), "frame: %.2f ms", dt * 1000);
+  // snprintf(fpsStr, sizeof(fpsStr), "frame: %.2f ms", dt * 1000);
+
+  const int meanWindow = 128;
+  double meanTime = 0;
+  for (int i = IM_ARRAYSIZE(s_frameTimes) - meanWindow; i < IM_ARRAYSIZE(s_frameTimes); i++)
+    meanTime += s_frameTimes[i];
+  meanTime /= meanWindow;
+  snprintf(fpsStr, sizeof(fpsStr), "mean frame: %.2f ms (%.2f FPS)", meanTime * 1000, 1.0 / meanTime);
+
   ImGui::Text(fpsStr);
 
   ImGui::Text("Rendering:");
@@ -354,7 +437,19 @@ static void drawUI(GLFWwindow* window, double dt)
   ImGui::Checkbox("Draw Reference Implementation", &s_bDrawReferenceImplementation);
   ImGui::EndGroup();
 
-  
+  // Recenter the plot every 1000 frames.
+  //static int iframe = 0;
+  //if ((iframe++ % 1000) == 0)
+  //  ImPlot::SetNextAxisToFit(ImAxis_Y1);
+  ImPlot::SetNextAxisLimits(ImAxis_Y1, 0.0, 0.01);
+
+  if (ImPlot::BeginPlot("##plot"))
+  {
+    ImPlot::PlotLine("Frame time:", s_frameTimes, IM_ARRAYSIZE(s_frameTimes), 1.0, 0.0);
+    ImPlot::EndPlot();
+  }
+
+
   ImGui::End();
 }
 

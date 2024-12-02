@@ -154,6 +154,7 @@ public:
 
   void reset();
   void bind(int vertex, int index);
+  GLuint getNumGeneratedElements();
   void draw(int numElements);
 
   // delete copy constructor
@@ -175,6 +176,14 @@ public:
 
   void draw() const;
   void drawPatches() const;
+
+  inline GLuint getTotalElements() const
+  {
+    GLuint elem = 0;
+    for (const MeshPart& part : m_parts)
+      elem += part.numElements;
+    return elem;
+  }
 };
 
 class TargetMesh
