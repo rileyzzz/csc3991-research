@@ -289,6 +289,10 @@ int main()
     glActiveTexture(GL_TEXTURE0);
     dispTex->bind();
 
+
+    // TODO: send this indirectly!
+    GLuint numGenerated = generatedMesh->getNumGeneratedElements();
+
     // Render the generated mesh.
     glBeginQuery(GL_TIME_ELAPSED, s_glQueries[(int)GLQuery::TilemeshRenderTime]);
     if (s_bDrawReferenceImplementation)
@@ -296,9 +300,8 @@ int main()
       int numSurfaceTris = target->numTriangles();
       int maxSurfaceIndices = tile->getNumIndices() * 4 * numSurfaceTris;
 
-      // TODO: send this indirectly!
-      generatedMesh->draw(maxSurfaceIndices);
-      //generatedMesh->draw(generatedMesh->getNumGeneratedElements());
+      //generatedMesh->draw(maxSurfaceIndices);
+      generatedMesh->draw(numGenerated);
     }
     glEndQuery(GL_TIME_ELAPSED);
 
