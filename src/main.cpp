@@ -271,20 +271,6 @@ int main()
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
 
-    // Frame analysis.
-    /*
-    s_nTrianglesOnScreen = 0;
-    if (s_bDrawReferenceImplementation)
-    {
-      s_nTrianglesOnScreen += generatedMesh->getNumGeneratedElements() / 3;
-    }
-    if (s_bDrawTessellatedMesh)
-    {
-      // TODO: factor tesselation values.
-      s_nTrianglesOnScreen += (monkey->getTotalElements() / 3);
-    }
-    */
-
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
@@ -307,6 +293,16 @@ int main()
 
     // Nanoseconds to seconds.
     s_frameTimes[IM_ARRAYSIZE(s_frameTimes) - 1] = (double)totalTime * 1e-9;
+
+    s_nTrianglesOnScreen = 0;
+    if (s_bDrawReferenceImplementation)
+    {
+      s_nTrianglesOnScreen += generatedMesh->getNumGeneratedElements() / 3;
+    }
+    if (s_bDrawTessellatedMesh)
+    {
+      s_nTrianglesOnScreen += tesselationTris;
+    }
 
     glfwSwapBuffers(window);
     glfwPollEvents();
@@ -426,7 +422,9 @@ static void drawUI(GLFWwindow* window, double dt)
     meanTime += s_frameTimes[i];
   meanTime /= meanWindow;
   snprintf(fpsStr, sizeof(fpsStr), "mean frame: %.2f ms (%.2f FPS)", meanTime * 1000, 1.0 / meanTime);
+  ImGui::Text(fpsStr);
 
+  snprintf(fpsStr, sizeof(fpsStr), "%d triangles", s_nTrianglesOnScreen);
   ImGui::Text(fpsStr);
 
   ImGui::Text("Rendering:");
