@@ -1,4 +1,3 @@
-#version 460 core
 
 layout (local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
 
@@ -95,21 +94,6 @@ void projectOntoTriangle(inout Vertex v, in Triangle tri, int iTile) {
         (tri.p2 - triCenter) * baryNormal.z +
         v.normal.y * tri.normal);
     v.normal = finalNorm;
-
-    // vec3 srcpos = tri.p0;
-    // if (iTile == 1) srcpos = tri.p1;
-    // if (iTile == 2) srcpos = tri.p2;
-
-    // srcpos = triCenter * 0.8 + srcpos * 0.2;
-    // srcpos += tri.normal;
-
-    // scale down a bit.
-    // v.position *= 0.4;
-
-    // v.position = srcpos + tangentBasis * (v.position + vec3(iTile, 0, 0));
-    // v.position = srcpos + tangentBasis * v.position;
-    // v.position = srcpos + v.position;
-    // v.position = triCenter + v.position + iTile * tri.normal * 0.1;
 }
 
 float planeSide(vec3 v, vec4 plane) {
@@ -259,23 +243,24 @@ void main() {
     triVertex[1] = in_Triangles[iTargetTriangle].p1;
     triVertex[2] = in_Triangles[iTargetTriangle].p2;
 
-    /*
-    uint outBase = atomicAdd(out_baseVertex, 3);
-    uint indexBase = atomicAdd(out_baseIndex, 3);
-    for (int iVert = 0; iVert < 3; iVert++)
-    {
-        uint tileIndex = in_TileIndices[iTileTriangle * 3 + iVert];
-        Vertex v = in_TileVertices[tileIndex];
-        projectOntoTriangle(v, in_Triangles[iTargetTriangle], 0);
-        out_Vertices[outBase + iVert] = v;
-        out_TileIndices[indexBase + iVert] = outBase + iVert;
+    #if !ENABLE_CLIPPING
+    for (int iTile = 0; iTile < 4; iTile++) {
+        uint outBase = atomicAdd(out_baseVertex, 3);
+        uint indexBase = atomicAdd(out_baseIndex, 3);
+        for (int iVert = 0; iVert < 3; iVert++)
+        {
+            uint tileIndex = in_TileIndices[iTileTriangle * 3 + iVert];
+            Vertex v = in_TileVertices[tileIndex];
+            projectOntoTriangle(v, in_Triangles[iTargetTriangle], iTile);
+            out_Vertices[outBase + iVert] = v;
+            out_TileIndices[indexBase + iVert] = outBase + iVert;
+        }
     }
-    */
-
 
     // int out_baseVertex = in_Triangles[iTargetTriangle].tileBase * in_TileVertices.length();
     // int out_baseIndex = in_Triangles[iTargetTriangle].tileBase * in_TileIndices.length();
 
+    #else // ENABLE_CLIPPING
     for (int iTile = 0; iTile < 4; iTile++) {
         uint srcIdx[SCRATCH_INDEX_COUNT];
         int numIdx = 3;
@@ -339,4 +324,5 @@ void main() {
             out_TileIndices[indexBase + i] = outBase + generated_Indices[i];
 
     }
+    #endif // ENABLE_CLIPPING
 }

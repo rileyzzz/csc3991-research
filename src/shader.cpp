@@ -5,11 +5,11 @@
 
 static char shaderLog[512];
 
-Shader::Shader(GLuint type, const std::string& path)
+Shader::Shader(GLuint type, const std::string& path, const DefinesList& defines)
   : id(0)
   , type(type)
 {
-  loadFromFile(type, path);
+  loadFromFile(type, path, defines);
 }
 
 Shader::~Shader()
@@ -17,12 +17,18 @@ Shader::~Shader()
   glDeleteShader(id);
 }
 
-void Shader::loadFromFile(GLuint type, const std::string& path)
+void Shader::loadFromFile(GLuint type, const std::string& path, const DefinesList& defines)
 {
   id = glCreateShader(type);
 
   std::ifstream t(path);
   std::stringstream buffer;
+
+  buffer << "#version 460 core\n";
+
+  for (const auto& [name, value] : defines)
+    buffer << "#define " << name << " " << value << "\n";
+
   buffer << t.rdbuf();
 
   std::string sourceStr = buffer.str();

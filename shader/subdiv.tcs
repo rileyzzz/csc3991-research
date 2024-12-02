@@ -1,4 +1,3 @@
-#version 410 core
 
 // specify number of control points per patch output
 // this value controls the size of the input and output arrays

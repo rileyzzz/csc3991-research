@@ -32,9 +32,22 @@ static glm::vec3 cameraRight;
 
 static bool bDraggingMouse = false;
 
+enum class ClippingMode
+{
+  Off,
+  On,
+
+  Max
+};
+
+static std::unique_ptr<ShaderProgram> tilegen[(int)ClippingMode::Max];
+std::unique_ptr<ShaderProgram>& getTilegenShader(ClippingMode clip)
+{
+  return tilegen[(int)clip];
+}
+
 static std::unique_ptr<ShaderProgram> simpleMaterial;
 static std::unique_ptr<ShaderProgram> subdivMaterial;
-static std::unique_ptr<ShaderProgram> tilegen;
 static std::unique_ptr<Texture> dispTex;
 static std::unique_ptr<GPUMeshStreams> generatedMesh;
 //static std::unique_ptr<StorageBuffer> outputVertices;
@@ -43,10 +56,11 @@ static std::unique_ptr<GPUMeshStreams> generatedMesh;
 static bool s_bDrawWireframe = false;
 static bool s_bDrawTessellatedMesh = true;
 static bool s_bComputeReferenceImplementation = false;
+static bool s_bEnableClipping = true;
 static bool s_bDrawReferenceImplementation = false;
 static int s_nTrianglesOnScreen = 0;
 
-enum GLQuery
+enum class GLQuery
 {
   ComputeTime,
   TessellationTriangles,
@@ -264,7 +278,7 @@ int main()
 
       // TODO: send this indirectly!
       generatedMesh->draw(maxSurfaceIndices);
-      // generatedMesh->draw(generatedMesh->getNumGeneratedElements());
+      //generatedMesh->draw(generatedMesh->getNumGeneratedElements());
     }
     glEndQuery(GL_TIME_ELAPSED);
 
@@ -337,7 +351,8 @@ static void generateSurfaceGeometry(const TargetMesh& target, const TileMesh& ti
   //int numWorkgroupsX = tile.getNumIndices() / 3;
   //int numWorkgroupsY = target.numTriangles();
 
-  tilegen->bind();
+  getTilegenShader(s_bEnableClipping ? ClippingMode::On : ClippingMode::Off)->bind();
+
   glDispatchCompute(numWorkgroupsX, 1, 1);
 
   // Unbind mesh streams.
@@ -388,14 +403,19 @@ static void loadShaders(void)
     subdivMaterial = std::make_unique<ShaderProgram>(progs);
   }
 
+  for (int clipMode = 0; clipMode < (int)ClippingMode::Max; clipMode++)
   {
     std::filesystem::path csPath = std::filesystem::path(SHADERS_DIR) / "tilegen.glsl";
 
+    Shader::DefinesList defines;
+
+    defines.push_back({ "ENABLE_CLIPPING", clipMode == 1 ? "1" : "0" });
+
     // these are destructed when the function exits.
-    Shader computeProg(GL_COMPUTE_SHADER, csPath.string());
+    Shader computeProg(GL_COMPUTE_SHADER, csPath.string(), defines);
 
     std::vector<Shader*> progs = { &computeProg };
-    tilegen = std::make_unique<ShaderProgram>(progs);
+    getTilegenShader((ClippingMode)clipMode) = std::make_unique<ShaderProgram>(progs);
   }
 
 }
@@ -431,7 +451,12 @@ static void drawUI(GLFWwindow* window, double dt)
   ImGui::BeginGroup();
   ImGui::Checkbox("Wireframe", &s_bDrawWireframe);
   ImGui::Checkbox("Draw Tessellated Mesh", &s_bDrawTessellatedMesh);
+
   ImGui::Checkbox("Compute Reference Implementation", &s_bComputeReferenceImplementation);
+  ImGui::BeginGroup();
+  ImGui::Checkbox("Enable Clipping", &s_bEnableClipping);
+  ImGui::EndGroup();
+
   ImGui::Checkbox("Draw Reference Implementation", &s_bDrawReferenceImplementation);
   ImGui::EndGroup();
 

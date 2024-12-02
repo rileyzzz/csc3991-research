@@ -7,10 +7,12 @@
 struct Shader
 {
 public:
+  typedef std::vector<std::pair<std::string, std::string>> DefinesList;
+
   GLuint id;
   GLuint type;
 
-  Shader(GLuint type, const std::string& path);
+  Shader(GLuint type, const std::string& path, const DefinesList& defines = DefinesList());
   ~Shader();
   
   // delete copy constructor
@@ -18,7 +20,7 @@ public:
   Shader& operator=(const Shader&) = delete;
 
 protected:
-  void loadFromFile(GLuint type, const std::string& path);
+  void loadFromFile(GLuint type, const std::string& path, const DefinesList& defines);
 };
 
 
