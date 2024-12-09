@@ -7,6 +7,7 @@
 #include "shader.h"
 #include "texture.h"
 #include "buffer.h"
+#include "statsobject.hpp"
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtc/matrix_transform.hpp>
@@ -93,6 +94,11 @@ static GLuint s_glQueries[(int)GLQuery::Max] = { 0 };
 
 #define FRAMETIME_WINDOW 1024
 static double s_frameTimes[FRAMETIME_WINDOW] = { 0 };
+
+// Stats objects.
+static bool s_bRecordingFrametime = false;
+static StatsObject s_statsFrametime("frametime.csv", { "Compute", "Tesselation", "Render" });
+
 
 static std::unique_ptr<Mesh> loadMesh(const std::string& mesh);
 static std::unique_ptr<TargetMesh> loadTargetMesh(const std::string& mesh);
@@ -330,6 +336,10 @@ int main()
 
     // Nanoseconds to seconds.
     s_frameTimes[IM_ARRAYSIZE(s_frameTimes) - 1] = (double)totalTime * 1e-9;
+    if (s_bRecordingFrametime)
+    {
+      s_statsFrametime.AddData({ std::to_string(computeTime), std::to_string(tesselationRenderTime), std::to_string(tilemeshRenderTime) });
+    }
 
     s_nTrianglesOnScreen = 0;
     if (s_bDrawReferenceImplementation)
@@ -496,6 +506,20 @@ static void drawUI(GLFWwindow* window, double dt)
   {
     ImPlot::PlotLine("Frame time:", s_frameTimes, IM_ARRAYSIZE(s_frameTimes), 1.0, 0.0);
     ImPlot::EndPlot();
+  }
+
+  if (ImGui::Button(s_bRecordingFrametime ? "Stop Recording" : "Record"))
+  {
+    s_bRecordingFrametime = !s_bRecordingFrametime;
+  }
+
+  if (!s_bRecordingFrametime && s_statsFrametime.HasData())
+  {
+    if (ImGui::Button("Save Data"))
+    {
+      s_statsFrametime.Save();
+      s_statsFrametime.Clear();
+    }
   }
 
 
