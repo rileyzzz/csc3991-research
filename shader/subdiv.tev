@@ -27,6 +27,10 @@ void main()
     float heightStrength = 0.1;
     float height = texture(displacement, texCoord).r * heightStrength;
 
+    // float t = 0.01;
+    // float dx = (texture(displacement, texCoord + vec2(t, 0)).r - texture(displacement, texCoord - vec2(t, 0)).r) * heightStrength;
+    // float dy = (texture(displacement, texCoord + vec2(0, t)).r - texture(displacement, texCoord - vec2(0, t)).r) * heightStrength;
+
     vec4 p0 = gl_in[0].gl_Position;
     vec4 p1 = gl_in[1].gl_Position;
     vec4 p2 = gl_in[2].gl_Position;
