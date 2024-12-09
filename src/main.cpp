@@ -67,9 +67,12 @@ static std::unique_ptr<ShaderProgram>& getTilegenShader(ClippingMode clip, Threa
 }
 
 static std::unique_ptr<ShaderProgram> simpleMaterial;
+static std::unique_ptr<ShaderProgram> texturedMaterial;
 static std::unique_ptr<ShaderProgram> subdivMaterial;
 static std::unique_ptr<Texture> dispTex;
 static std::unique_ptr<GPUMeshStreams> generatedMesh;
+
+static std::unique_ptr<Mesh> s_sponza;
 //static std::unique_ptr<StorageBuffer> outputVertices;
 //static std::unique_ptr<StorageBuffer> outputIndices;
 
@@ -109,6 +112,7 @@ static void updateInput(GLFWwindow* window, float dt);
 static void updateCamera(GLFWwindow* window);
 
 static void generateSurfaceGeometry(const TargetMesh& target, const TileMesh& tile);
+static void drawScene(void);
 
 void glfwErrorCallback(int error, const char* description)
 {
@@ -214,7 +218,7 @@ int main()
   auto tile = loadTileMesh("tile_brick.obj");
   //auto monkey = loadMesh("cube.obj");
   auto monkey = loadMesh("cube_simple.obj");
-  auto sponza = loadMesh("sponza/sponza.obj");
+  s_sponza = loadMesh("sponza/sponza.obj");
 
   const int maxVertices = 1024 * 128 * 12;
   const int maxIndices = 3 * maxVertices;
@@ -289,6 +293,9 @@ int main()
     glEndQuery(GL_TIME_ELAPSED);
     glEndQuery(GL_PRIMITIVES_GENERATED);
 
+
+    drawScene();
+
     simpleMaterial->bind();
 
     // Set uniforms.
@@ -297,10 +304,6 @@ int main()
 
     glActiveTexture(GL_TEXTURE0);
     dispTex->bind();
-
-    model = glm::scale(glm::mat4(1.f), glm::vec3(0.01f, 0.01f, 0.01f));
-    glUniformMatrix4fv(simpleMaterial->getUniformLocation("model"), 1, GL_FALSE, glm::value_ptr(model));
-    sponza->draw();
 
     model = glm::mat4(1.f);
     glUniformMatrix4fv(simpleMaterial->getUniformLocation("model"), 1, GL_FALSE, glm::value_ptr(model));
@@ -400,6 +403,24 @@ static void generateSurfaceGeometry(const TargetMesh& target, const TileMesh& ti
   // Unbind mesh streams.
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, 0);
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, 0);
+}
+
+static void drawScene(void)
+{
+
+  simpleMaterial->bind();
+
+  // Set uniforms.
+  glUniformMatrix4fv(simpleMaterial->getUniformLocation("viewProj"), 1, GL_FALSE, glm::value_ptr(viewProj));
+  glUniform3fv(simpleMaterial->getUniformLocation("viewPos"), 1, glm::value_ptr(cameraPos));
+
+  glm::mat4 model = glm::scale(glm::mat4(1.f), glm::vec3(0.01f, 0.01f, 0.01f));
+  glUniformMatrix4fv(simpleMaterial->getUniformLocation("model"), 1, GL_FALSE, glm::value_ptr(model));
+
+  glActiveTexture(GL_TEXTURE0);
+  dispTex->bind();
+
+  s_sponza->draw();
 }
 
 static std::unique_ptr<Mesh> loadMesh(const std::string& mesh)
