@@ -8,6 +8,7 @@ out vec3 fragNormal;
 out vec2 texCoord;
 
 uniform mat4 viewProj;
+uniform mat4 model;
 
 uniform sampler2D displacement;
 
@@ -40,5 +41,5 @@ void main()
 
 	fragPos.xyz += vNormal * texture(displacement, vUV).r * heightStrength;
 
-	gl_Position = viewProj * fragPos;
+	gl_Position = viewProj * model * fragPos;
 }

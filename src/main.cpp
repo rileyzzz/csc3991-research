@@ -214,6 +214,7 @@ int main()
   auto tile = loadTileMesh("tile_brick.obj");
   //auto monkey = loadMesh("cube.obj");
   auto monkey = loadMesh("cube_simple.obj");
+  auto sponza = loadMesh("sponza/sponza.obj");
 
   const int maxVertices = 1024 * 128 * 12;
   const int maxIndices = 3 * maxVertices;
@@ -271,7 +272,9 @@ int main()
     subdivMaterial->bind();
 
     // Set uniforms.
+    glm::mat4 model(1.f);
     glUniformMatrix4fv(subdivMaterial->getUniformLocation("viewProj"), 1, GL_FALSE, glm::value_ptr(viewProj));
+    glUniformMatrix4fv(subdivMaterial->getUniformLocation("model"), 1, GL_FALSE, glm::value_ptr(model));
     glUniform3fv(subdivMaterial->getUniformLocation("viewPos"), 1, glm::value_ptr(cameraPos));
 
     glActiveTexture(GL_TEXTURE0);
@@ -295,6 +298,12 @@ int main()
     glActiveTexture(GL_TEXTURE0);
     dispTex->bind();
 
+    model = glm::scale(glm::mat4(1.f), glm::vec3(0.01f, 0.01f, 0.01f));
+    glUniformMatrix4fv(simpleMaterial->getUniformLocation("model"), 1, GL_FALSE, glm::value_ptr(model));
+    sponza->draw();
+
+    model = glm::mat4(1.f);
+    glUniformMatrix4fv(simpleMaterial->getUniformLocation("model"), 1, GL_FALSE, glm::value_ptr(model));
 
     // TODO: send this indirectly!
     GLuint numGenerated = generatedMesh->getNumGeneratedElements();
@@ -585,7 +594,7 @@ static void updateCamera(GLFWwindow* window)
   float aspect = (float)w / (float)h;
 
   // Camera setup.
-  proj = glm::perspective(glm::radians(60.f), aspect, 0.01f, 10.f);
+  proj = glm::perspective(glm::radians(60.f), aspect, 0.01f, 100.f);
 
   view = glm::mat4(1.f);
   view = glm::translate(view, glm::vec3(0, 0, cameraDist));
