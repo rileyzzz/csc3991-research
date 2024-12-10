@@ -5,10 +5,16 @@
 #include <tiny_obj_loader.h>
 
 #include <iostream>
-
+#include <filesystem>
 
 MeshPart::MeshPart(const MeshPartData& data)
 {
+  if (!data.diffuseTex.empty())
+  {
+    std::cout << "Loading texture '" << data.diffuseTex << "'\n";
+    diffuseTex = std::make_unique<Texture>(data.diffuseTex);
+  }
+
   if (data.vtx.empty() || data.idx.empty())
   {
     VAO = VBO = EBO = numElements = 0;
@@ -77,6 +83,12 @@ MeshPart::~MeshPart()
 
 void MeshPart::draw() const
 {
+  if (diffuseTex)
+  {
+    glActiveTexture(GL_TEXTURE0);
+    diffuseTex->bind();
+  }
+
   glBindVertexArray(VAO);
   glDrawElements(GL_TRIANGLES, numElements, GL_UNSIGNED_INT, 0);
 }
@@ -88,7 +100,7 @@ void MeshPart::drawPatches() const
   glDrawElements(GL_PATCHES, numElements, GL_UNSIGNED_INT, 0);
 }
 
-static void loadParts(tinyobj::ObjReader& reader, std::vector<MeshPartData>& partData, bool ignoreMaterials = false)
+static void loadParts(tinyobj::ObjReader& reader, std::vector<MeshPartData>& partData, const std::string& materialsPath, bool ignoreMaterials = false)
 {
   auto& attrib = reader.GetAttrib();
   auto& shapes = reader.GetShapes();
@@ -98,6 +110,17 @@ static void loadParts(tinyobj::ObjReader& reader, std::vector<MeshPartData>& par
   if (!ignoreMaterials)
   {
     partData.resize(1 + materials.size(), MeshPartData());
+
+    // Load materials.
+    for (int i = 0; i < materials.size(); i++)
+    {
+      //std::cout << materialsPath << "\n";
+      const std::string& texname = materials[i].diffuse_texname;
+      if (!texname.empty())
+      {
+        partData[i + 1].diffuseTex = std::format("{}/{}", materialsPath, materials[i].diffuse_texname);
+      }
+    }
   }
   else
   {
@@ -378,6 +401,8 @@ Mesh::~Mesh()
 
 void Mesh::loadFromFile(const std::string& file)
 {
+  std::string materialsPath = std::filesystem::path(file).parent_path().string();
+
   tinyobj::ObjReaderConfig reader_config;
   //reader_config.mtl_search_path = "./"; // Path to material files
 
@@ -400,7 +425,7 @@ void Mesh::loadFromFile(const std::string& file)
   // Create buffers.
 
   std::vector<MeshPartData> partData;
-  loadParts(reader, partData);
+  loadParts(reader, partData, materialsPath);
 
   // Finalize parts.
   for (int iPart = 0; iPart < partData.size(); ++iPart)
@@ -458,7 +483,7 @@ void TargetMesh::loadFromFile(const std::string& file)
   }
 
   std::vector<MeshPartData> partData;
-  loadParts(reader, partData, true);
+  loadParts(reader, partData, "", true);
 
   if (partData.size() != 1)
   {
@@ -498,7 +523,7 @@ void TileMesh::loadFromFile(const std::string& file)
   }
 
   std::vector<MeshPartData> partData;
-  loadParts(reader, partData, true);
+  loadParts(reader, partData, "", true);
 
   if (partData.size() != 1)
   {

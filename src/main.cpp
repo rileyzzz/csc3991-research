@@ -407,8 +407,8 @@ static void generateSurfaceGeometry(const TargetMesh& target, const TileMesh& ti
 
 static void drawScene(void)
 {
-
-  simpleMaterial->bind();
+  texturedMaterial->bind();
+  //simpleMaterial->bind();
 
   // Set uniforms.
   glUniformMatrix4fv(simpleMaterial->getUniformLocation("viewProj"), 1, GL_FALSE, glm::value_ptr(viewProj));
@@ -417,8 +417,8 @@ static void drawScene(void)
   glm::mat4 model = glm::scale(glm::mat4(1.f), glm::vec3(0.01f, 0.01f, 0.01f));
   glUniformMatrix4fv(simpleMaterial->getUniformLocation("model"), 1, GL_FALSE, glm::value_ptr(model));
 
-  glActiveTexture(GL_TEXTURE0);
-  dispTex->bind();
+  //glActiveTexture(GL_TEXTURE0);
+  //dispTex->bind();
 
   s_sponza->draw();
 }
@@ -446,6 +446,7 @@ static void loadShaders(void)
   {
     std::filesystem::path vertPath = std::filesystem::path(SHADERS_DIR) / "simple.vs";
     std::filesystem::path fragPath = std::filesystem::path(SHADERS_DIR) / "simple.fs";
+    std::filesystem::path texturedFragPath = std::filesystem::path(SHADERS_DIR) / "textured.fs";
 
     std::filesystem::path subdivVertPath = std::filesystem::path(SHADERS_DIR) / "subdiv.vs";
     std::filesystem::path tcsPath = std::filesystem::path(SHADERS_DIR) / "subdiv.tcs";
@@ -464,6 +465,11 @@ static void loadShaders(void)
 
     progs = { &subdivVert, &tcs, &tev, &frag };
     subdivMaterial = std::make_unique<ShaderProgram>(progs);
+
+    Shader texturedFrag(GL_FRAGMENT_SHADER, texturedFragPath.string());
+
+    progs = { &vert, &texturedFrag };
+    texturedMaterial = std::make_unique<ShaderProgram>(progs);
   }
 
   for (int threadgroupSizeEnum = 0; threadgroupSizeEnum < (int)ThreadgroupSize::Max; threadgroupSizeEnum++)

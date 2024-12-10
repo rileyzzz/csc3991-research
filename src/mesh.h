@@ -5,6 +5,8 @@
 #include <string>
 #include <unordered_map>
 #include <tuple>
+#include <memory>
+#include "texture.h"
 
 struct MeshVertex
 {
@@ -37,7 +39,7 @@ struct MeshPartData
 {
   std::vector<MeshVertex> vtx;
   std::vector<unsigned int> idx;
-
+  std::string diffuseTex;
   std::unordered_map<MeshIndexKey, int> idxToVtxCache;
 };
 
@@ -48,6 +50,7 @@ public:
   GLuint VBO;
   GLuint EBO;
   GLuint numElements;
+  std::unique_ptr<Texture> diffuseTex;
 
   MeshPart() : VAO(0), VBO(0), EBO(0), numElements(0) { }
   MeshPart(const MeshPartData& data);
@@ -226,6 +229,7 @@ MeshPart::MeshPart(MeshPart&& rhs) noexcept
   , VBO(rhs.VBO)
   , EBO(rhs.EBO)
   , numElements(rhs.numElements)
+  , diffuseTex(std::move(rhs.diffuseTex))
 {
   rhs.VAO = 0;
   rhs.VBO = 0;
@@ -246,6 +250,8 @@ MeshPart& MeshPart::operator=(MeshPart&& rhs) noexcept
 
   numElements = rhs.numElements;
   rhs.numElements = 0;
+
+  diffuseTex = std::move(rhs.diffuseTex);
 
   return *this;
 }
