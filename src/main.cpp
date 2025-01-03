@@ -51,6 +51,20 @@ enum class ThreadgroupSize : int
   Max
 };
 
+enum class MeshTarget : int
+{
+  Cube_Simple,
+  Cube_1,
+  Cube_2,
+  Cube_3,
+  Cube_4,
+  Ico,
+  Cylinder,
+  Sponza,
+
+  Count
+};
+
 static GLuint getThreadgroupSize(ThreadgroupSize size)
 {
   if (size == ThreadgroupSize::Threads_64) return 64;
@@ -72,7 +86,11 @@ static std::unique_ptr<ShaderProgram> subdivMaterial;
 static std::unique_ptr<Texture> dispTex;
 static std::unique_ptr<GPUMeshStreams> generatedMesh;
 
-static std::unique_ptr<Mesh> s_sponza;
+//static std::unique_ptr<Mesh> s_sponza;
+static int s_curMeshTarget = (int)MeshTarget::Cube_2;
+static std::vector<std::unique_ptr<TargetMesh>> s_meshTarget;
+static std::vector<std::unique_ptr<Mesh>> s_tessellationTarget;
+
 //static std::unique_ptr<StorageBuffer> outputVertices;
 //static std::unique_ptr<StorageBuffer> outputIndices;
 
@@ -212,19 +230,32 @@ int main()
   // Load shaders.
   loadShaders();
 
-  auto target = loadTargetMesh("cube_simple.obj");
+  //auto target = loadTargetMesh("cube_simple.obj");
   //auto target = loadTargetMesh("test_ico.obj");
   //auto target = loadTargetMesh("test_torus.obj");
   auto tile = loadTileMesh("tile_brick.obj");
   //auto monkey = loadMesh("cube.obj");
-  auto monkey = loadMesh("cube_simple.obj");
-  s_sponza = loadMesh("sponza/sponza.obj");
+  //auto monkey = loadMesh("cube_simple.obj");
+  //s_sponza = loadMesh("sponza/sponza.obj");
+
+  s_meshTarget.resize((int)MeshTarget::Count);
+  s_meshTarget[(int)MeshTarget::Cube_Simple] = loadTargetMesh("cube_simple.obj");
+  s_meshTarget[(int)MeshTarget::Cube_1] = loadTargetMesh("cube_1.obj");
+  s_meshTarget[(int)MeshTarget::Cube_2] = loadTargetMesh("cube_2.obj");
+  s_meshTarget[(int)MeshTarget::Cube_3] = loadTargetMesh("cube_3.obj");
+  s_meshTarget[(int)MeshTarget::Cube_4] = loadTargetMesh("cube_4.obj");
+
+  s_tessellationTarget.resize((int)MeshTarget::Count);
+  s_tessellationTarget[(int)MeshTarget::Cube_Simple] = loadMesh("cube_simple.obj");
+  s_tessellationTarget[(int)MeshTarget::Cube_1] = loadMesh("cube_1.obj");
+  s_tessellationTarget[(int)MeshTarget::Cube_2] = loadMesh("cube_2.obj");
+  s_tessellationTarget[(int)MeshTarget::Cube_3] = loadMesh("cube_3.obj");
+  s_tessellationTarget[(int)MeshTarget::Cube_4] = loadMesh("cube_4.obj");
+
 
   const int maxVertices = 1024 * 128 * 12;
   const int maxIndices = 3 * maxVertices;
   generatedMesh = std::make_unique<GPUMeshStreams>(maxVertices, maxIndices);
-
-  //auto monkey = loadMesh("monkey_high.obj");
 
   dispTex = std::make_unique<Texture>((std::filesystem::path(SCENE_DIR) / "brick.jpg").string());
 
@@ -265,11 +296,19 @@ int main()
       glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     }
 
+    TargetMesh* curTarget = nullptr;
+    Mesh* tessellateMesh = nullptr;
+    if (s_curMeshTarget >= 0 && s_curMeshTarget < (int)MeshTarget::Count)
+    {
+      curTarget = s_meshTarget[s_curMeshTarget].get();
+      tessellateMesh = s_tessellationTarget[s_curMeshTarget].get();
+    }
+
     // Compute phase.
     glBeginQuery(GL_TIME_ELAPSED, s_glQueries[(int)GLQuery::ComputeTime]);
-    if (s_bComputeReferenceImplementation)
+    if (s_bComputeReferenceImplementation && curTarget)
     {
-      generateSurfaceGeometry(*target, *tile);
+      generateSurfaceGeometry(*curTarget, *tile);
     }
     glEndQuery(GL_TIME_ELAPSED);
 
@@ -286,9 +325,9 @@ int main()
 
     glBeginQuery(GL_TIME_ELAPSED, s_glQueries[(int)GLQuery::TessellationRenderTime]);
     glBeginQuery(GL_PRIMITIVES_GENERATED, s_glQueries[(int)GLQuery::TessellationTriangles]);
-    if (s_bDrawTessellatedMesh)
+    if (s_bDrawTessellatedMesh && tessellateMesh)
     {
-      monkey->drawPatches();
+      tessellateMesh->drawPatches();
     }
     glEndQuery(GL_TIME_ELAPSED);
     glEndQuery(GL_PRIMITIVES_GENERATED);
@@ -313,9 +352,9 @@ int main()
 
     // Render the generated mesh.
     glBeginQuery(GL_TIME_ELAPSED, s_glQueries[(int)GLQuery::TilemeshRenderTime]);
-    if (s_bDrawReferenceImplementation)
+    if (s_bDrawReferenceImplementation && curTarget)
     {
-      int numSurfaceTris = target->numTriangles();
+      int numSurfaceTris = curTarget->numTriangles();
       int maxSurfaceIndices = tile->getNumIndices() * 4 * numSurfaceTris;
 
       //generatedMesh->draw(maxSurfaceIndices);
@@ -417,10 +456,10 @@ static void drawScene(void)
   glm::mat4 model = glm::scale(glm::mat4(1.f), glm::vec3(0.01f, 0.01f, 0.01f));
   glUniformMatrix4fv(simpleMaterial->getUniformLocation("model"), 1, GL_FALSE, glm::value_ptr(model));
 
-  //glActiveTexture(GL_TEXTURE0);
-  //dispTex->bind();
-
-  s_sponza->draw();
+  //if (s_sponza)
+  //{
+  //  s_sponza->draw();
+  //}
 }
 
 static std::unique_ptr<Mesh> loadMesh(const std::string& mesh)
@@ -518,6 +557,8 @@ static void drawUI(GLFWwindow* window, double dt)
   snprintf(fpsStr, sizeof(fpsStr), "%d triangles", s_nTrianglesOnScreen);
   ImGui::Text(fpsStr);
 
+  ImGui::Combo("Target Mesh", &s_curMeshTarget, "Simple Cube\000Subdiv Cube (1)\000Subdiv Cube (2)\000Subdiv Cube (3)\000Subdiv Cube (4)\000Icosahedron\000Cylinder\000Sponza\0\0");
+  
   ImGui::Text("Rendering:");
   ImGui::BeginGroup();
   ImGui::Checkbox("Wireframe", &s_bDrawWireframe);
