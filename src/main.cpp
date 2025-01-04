@@ -70,9 +70,24 @@ enum class MeshTarget : int
   SmoothIco,
   SmoothIco3,
   Cylinder,
+  SmoothCylinder,
   Sponza,
 
   Count
+};
+
+const char* s_meshTargetNames[(int)MeshTarget::Count] = {
+  "Simple Cube",
+  "Subdiv Cube(1)",
+  "Subdiv Cube(2)",
+  "Subdiv Cube(3)",
+  "Subdiv Cube(4)",
+  "Icosahedron",
+  "Smooth Icosahedron",
+  "Smooth Icosahedron(x3)",
+  "Cylinder",
+  "Smooth Cylinder",
+  "Sponza"
 };
 
 static GLuint getThreadgroupSize(ThreadgroupSize size)
@@ -261,6 +276,8 @@ int main()
   s_meshTarget[(int)MeshTarget::Ico] = loadTargetMesh("test_ico.obj");
   s_meshTarget[(int)MeshTarget::SmoothIco] = loadTargetMesh("smooth_ico.obj");
   s_meshTarget[(int)MeshTarget::SmoothIco3] = loadTargetMesh("smooth_ico_x3.obj");
+  s_meshTarget[(int)MeshTarget::Cylinder] = loadTargetMesh("cylinder.obj");
+  s_meshTarget[(int)MeshTarget::SmoothCylinder] = loadTargetMesh("cylinder_smooth.obj");
 
   s_tessellationTarget.resize((int)MeshTarget::Count);
   s_tessellationTarget[(int)MeshTarget::Cube_Simple] = loadMesh("cube_simple.obj");
@@ -271,6 +288,8 @@ int main()
   s_tessellationTarget[(int)MeshTarget::Ico] = loadMesh("test_ico.obj");
   s_tessellationTarget[(int)MeshTarget::SmoothIco] = loadMesh("smooth_ico.obj");
   s_tessellationTarget[(int)MeshTarget::SmoothIco3] = loadMesh("smooth_ico_x3.obj");
+  s_tessellationTarget[(int)MeshTarget::Cylinder] = loadMesh("cylinder.obj");
+  s_tessellationTarget[(int)MeshTarget::SmoothCylinder] = loadMesh("cylinder_smooth.obj");
 
 
   const int maxVertices = 1024 * 128 * 128;
@@ -608,7 +627,7 @@ static void drawUI(GLFWwindow* window, double dt)
   snprintf(fpsStr, sizeof(fpsStr), "%d triangles", s_nTrianglesOnScreen);
   ImGui::Text(fpsStr);
 
-  ImGui::Combo("Target Mesh", &s_curMeshTarget, "Simple Cube\000Subdiv Cube (1)\000Subdiv Cube (2)\000Subdiv Cube (3)\000Subdiv Cube (4)\000Icosahedron\000Smooth Icosahedron\000Smooth Icosahedron (x3)\000Cylinder\000Sponza\0\0");
+  ImGui::Combo("Target Mesh", &s_curMeshTarget, s_meshTargetNames, IM_ARRAYSIZE(s_meshTargetNames));
   
   ImGui::Text("Rendering:");
   ImGui::BeginGroup();
