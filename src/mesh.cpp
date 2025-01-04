@@ -58,6 +58,40 @@ MeshPart::MeshPart(const MeshPartData& data)
   offset += size;
 
   glBindVertexArray(0);
+
+  struct DebugVertex
+  {
+    glm::vec3 pos;
+  };
+
+  std::vector<DebugVertex> debugVertices;
+  for (const auto& vtx : data.vtx)
+  {
+    DebugVertex v;
+    v.pos = vtx.position;
+    debugVertices.push_back(v);
+    v.pos = vtx.position + vtx.normal;
+    debugVertices.push_back(v);
+  }
+  numDebugLineVerts = debugVertices.size();
+
+  // Setup line stuff.
+  glGenVertexArrays(1, &debugLine_VAO);
+  glBindVertexArray(debugLine_VAO);
+
+  glGenBuffers(1, &debugLine_VBO);
+  glBindBuffer(GL_ARRAY_BUFFER, debugLine_VBO);
+  glBufferData(GL_ARRAY_BUFFER, debugVertices.size() * sizeof(DebugVertex), (void*)debugVertices.data(), GL_STATIC_DRAW);
+
+  offset = 0;
+
+  // position
+  size = 3 * sizeof(float);
+  glEnableVertexAttribArray(0);
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(DebugVertex), (void*)offset);
+  offset += size;
+
+  glBindVertexArray(0);
 }
 
 MeshPart::~MeshPart()
@@ -79,6 +113,18 @@ MeshPart::~MeshPart()
     glDeleteBuffers(1, &EBO);
     EBO = 0;
   }
+
+  if (debugLine_VAO)
+  {
+    glDeleteVertexArrays(1, &debugLine_VAO);
+    debugLine_VAO = 0;
+  }
+
+  if (debugLine_VBO)
+  {
+    glDeleteBuffers(1, &debugLine_VBO);
+    debugLine_VBO = 0;
+  }
 }
 
 void MeshPart::draw() const
@@ -98,6 +144,12 @@ void MeshPart::drawPatches() const
   glPatchParameteri(GL_PATCH_VERTICES, 3);
   glBindVertexArray(VAO);
   glDrawElements(GL_PATCHES, numElements, GL_UNSIGNED_INT, 0);
+}
+
+void MeshPart::drawNormalVectors() const
+{
+  glBindVertexArray(debugLine_VAO);
+  glDrawArrays(GL_LINES, 0, numDebugLineVerts);
 }
 
 static void loadParts(tinyobj::ObjReader& reader, std::vector<MeshPartData>& partData, const std::string& materialsPath, bool ignoreMaterials = false)
@@ -249,6 +301,10 @@ TargetGeometryStream::TargetGeometryStream(const MeshPartData& data)
     stream[i].uvToBary2 = uvToBary[2];
     // stream[i].uvToBary = uvToBary;
 
+    stream[i].n0 = glm::normalize(v0.normal);
+    stream[i].n1 = glm::normalize(v1.normal);
+    stream[i].n2 = glm::normalize(v2.normal);
+
     // TODO: factor in area in compute shader.
     int numTiles = 4;
 
@@ -378,12 +434,17 @@ GLuint GPUMeshStreams::getNumGeneratedElements()
   return numElements;
 }
 
+//void GPUMeshStreams::updateIndirectBuffer()
+//{
+//  glMemoryBarrier(GL_ATOMIC_COUNTER_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
+//}
+
 void GPUMeshStreams::draw(int numElements)
 {
   glBindVertexArray(VAO);
   // glDrawElements(GL_TRIANGLES, numElements, GL_UNSIGNED_INT, 0);
 
-   glMemoryBarrier(GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT | GL_ELEMENT_ARRAY_BARRIER_BIT);
+  //glMemoryBarrier(GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT | GL_ELEMENT_ARRAY_BARRIER_BIT);
 
   GLintptr offset = 4;
   glDrawElements(GL_TRIANGLES, numElements, GL_UNSIGNED_INT, (void*)(offset));
@@ -453,6 +514,18 @@ void Mesh::drawPatches() const
     part.drawPatches();
   }
 }
+
+void Mesh::drawNormalVectors() const
+{
+  for (const MeshPart& part : m_parts)
+  {
+    if (part.numElements == 0)
+      continue;
+
+    part.drawNormalVectors();
+  }
+}
+
 
 TargetMesh::TargetMesh(const std::string& file)
 {

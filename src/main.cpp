@@ -41,6 +41,14 @@ enum class ClippingMode
   Max
 };
 
+enum class NormalMode
+{
+  Flat,
+  Smooth,
+
+  Max
+};
+
 enum class ThreadgroupSize : int
 {
   Threads_64,
@@ -59,6 +67,8 @@ enum class MeshTarget : int
   Cube_3,
   Cube_4,
   Ico,
+  SmoothIco,
+  SmoothIco3,
   Cylinder,
   Sponza,
 
@@ -74,15 +84,16 @@ static GLuint getThreadgroupSize(ThreadgroupSize size)
   return 0;
 }
 
-static std::unique_ptr<ShaderProgram> tilegen[(int)ClippingMode::Max][(int)ThreadgroupSize::Max];
-static std::unique_ptr<ShaderProgram>& getTilegenShader(ClippingMode clip, ThreadgroupSize threads)
+static std::unique_ptr<ShaderProgram> tilegen[(int)ClippingMode::Max][(int)NormalMode::Max][(int)ThreadgroupSize::Max];
+static std::unique_ptr<ShaderProgram>& getTilegenShader(ClippingMode clip, NormalMode normals, ThreadgroupSize threads)
 {
-  return tilegen[(int)clip][(int)threads];
+  return tilegen[(int)clip][(int)normals][(int)threads];
 }
 
 static std::unique_ptr<ShaderProgram> simpleMaterial;
 static std::unique_ptr<ShaderProgram> texturedMaterial;
 static std::unique_ptr<ShaderProgram> subdivMaterial;
+static std::unique_ptr<ShaderProgram> lineMaterial;
 static std::unique_ptr<Texture> dispTex;
 static std::unique_ptr<GPUMeshStreams> generatedMesh;
 
@@ -96,8 +107,10 @@ static std::vector<std::unique_ptr<Mesh>> s_tessellationTarget;
 
 static bool s_bDrawWireframe = false;
 static bool s_bDrawTessellatedMesh = true;
+static bool s_bDrawNormalVectors = false;
 static bool s_bComputeReferenceImplementation = false;
 static bool s_bEnableClipping = true;
+static bool s_bSmoothNormals = false;
 static ThreadgroupSize s_threadgroupSize = ThreadgroupSize::Threads_256;
 static bool s_bDrawReferenceImplementation = false;
 static int s_nTrianglesOnScreen = 0;
@@ -131,6 +144,7 @@ static void updateCamera(GLFWwindow* window);
 
 static void generateSurfaceGeometry(const TargetMesh& target, const TileMesh& tile);
 static void drawScene(void);
+static void drawLines(Mesh* mesh);
 
 void glfwErrorCallback(int error, const char* description)
 {
@@ -244,6 +258,9 @@ int main()
   s_meshTarget[(int)MeshTarget::Cube_2] = loadTargetMesh("cube_2.obj");
   s_meshTarget[(int)MeshTarget::Cube_3] = loadTargetMesh("cube_3.obj");
   s_meshTarget[(int)MeshTarget::Cube_4] = loadTargetMesh("cube_4.obj");
+  s_meshTarget[(int)MeshTarget::Ico] = loadTargetMesh("test_ico.obj");
+  s_meshTarget[(int)MeshTarget::SmoothIco] = loadTargetMesh("smooth_ico.obj");
+  s_meshTarget[(int)MeshTarget::SmoothIco3] = loadTargetMesh("smooth_ico_x3.obj");
 
   s_tessellationTarget.resize((int)MeshTarget::Count);
   s_tessellationTarget[(int)MeshTarget::Cube_Simple] = loadMesh("cube_simple.obj");
@@ -251,9 +268,12 @@ int main()
   s_tessellationTarget[(int)MeshTarget::Cube_2] = loadMesh("cube_2.obj");
   s_tessellationTarget[(int)MeshTarget::Cube_3] = loadMesh("cube_3.obj");
   s_tessellationTarget[(int)MeshTarget::Cube_4] = loadMesh("cube_4.obj");
+  s_tessellationTarget[(int)MeshTarget::Ico] = loadMesh("test_ico.obj");
+  s_tessellationTarget[(int)MeshTarget::SmoothIco] = loadMesh("smooth_ico.obj");
+  s_tessellationTarget[(int)MeshTarget::SmoothIco3] = loadMesh("smooth_ico_x3.obj");
 
 
-  const int maxVertices = 1024 * 128 * 12;
+  const int maxVertices = 1024 * 128 * 128;
   const int maxIndices = 3 * maxVertices;
   generatedMesh = std::make_unique<GPUMeshStreams>(maxVertices, maxIndices);
 
@@ -332,8 +352,12 @@ int main()
     glEndQuery(GL_TIME_ELAPSED);
     glEndQuery(GL_PRIMITIVES_GENERATED);
 
-
     drawScene();
+
+    if (s_bDrawNormalVectors && tessellateMesh)
+    {
+      drawLines(tessellateMesh);
+    }
 
     simpleMaterial->bind();
 
@@ -435,7 +459,9 @@ static void generateSurfaceGeometry(const TargetMesh& target, const TileMesh& ti
   //int numWorkgroupsX = tile.getNumIndices() / 3;
   //int numWorkgroupsY = target.numTriangles();
 
-  getTilegenShader(s_bEnableClipping ? ClippingMode::On : ClippingMode::Off, s_threadgroupSize)->bind();
+  getTilegenShader(s_bEnableClipping ? ClippingMode::On : ClippingMode::Off
+    , s_bSmoothNormals ? NormalMode::Smooth : NormalMode::Flat
+    , s_threadgroupSize)->bind();
 
   glDispatchCompute(numWorkgroupsX, 1, 1);
 
@@ -460,6 +486,21 @@ static void drawScene(void)
   //{
   //  s_sponza->draw();
   //}
+}
+
+static void drawLines(Mesh* mesh)
+{
+  lineMaterial->bind();
+
+  // Set uniforms.
+  glUniformMatrix4fv(lineMaterial->getUniformLocation("viewProj"), 1, GL_FALSE, glm::value_ptr(viewProj));
+  glUniform3fv(lineMaterial->getUniformLocation("viewPos"), 1, glm::value_ptr(cameraPos));
+
+  glm::mat4 model = glm::mat4(1.f);
+  glUniformMatrix4fv(lineMaterial->getUniformLocation("model"), 1, GL_FALSE, glm::value_ptr(model));
+
+
+  mesh->drawNormalVectors();
 }
 
 static std::unique_ptr<Mesh> loadMesh(const std::string& mesh)
@@ -490,6 +531,8 @@ static void loadShaders(void)
     std::filesystem::path subdivVertPath = std::filesystem::path(SHADERS_DIR) / "subdiv.vs";
     std::filesystem::path tcsPath = std::filesystem::path(SHADERS_DIR) / "subdiv.tcs";
     std::filesystem::path tevPath = std::filesystem::path(SHADERS_DIR) / "subdiv.tev";
+    std::filesystem::path lineVertPath = std::filesystem::path(SHADERS_DIR) / "line.vs";
+    std::filesystem::path lineFragPath = std::filesystem::path(SHADERS_DIR) / "line.fs";
 
     // these are destructed when the function exits.
     Shader vert(GL_VERTEX_SHADER, vertPath.string());
@@ -502,6 +545,9 @@ static void loadShaders(void)
     Shader tcs(GL_TESS_CONTROL_SHADER, tcsPath.string());
     Shader tev(GL_TESS_EVALUATION_SHADER, tevPath.string());
 
+    Shader lineVs(GL_VERTEX_SHADER, lineVertPath.string());
+    Shader lineFs(GL_FRAGMENT_SHADER, lineFragPath.string());
+
     progs = { &subdivVert, &tcs, &tev, &frag };
     subdivMaterial = std::make_unique<ShaderProgram>(progs);
 
@@ -509,9 +555,13 @@ static void loadShaders(void)
 
     progs = { &vert, &texturedFrag };
     texturedMaterial = std::make_unique<ShaderProgram>(progs);
+
+    progs = { &lineVs, &lineFs };
+    lineMaterial = std::make_unique<ShaderProgram>(progs);
   }
 
   for (int threadgroupSizeEnum = 0; threadgroupSizeEnum < (int)ThreadgroupSize::Max; threadgroupSizeEnum++)
+  for (int normalMode = 0; normalMode < (int)NormalMode::Max; normalMode++)
   for (int clipMode = 0; clipMode < (int)ClippingMode::Max; clipMode++)
   {
     std::filesystem::path csPath = std::filesystem::path(SHADERS_DIR) / "tilegen.glsl";
@@ -520,12 +570,13 @@ static void loadShaders(void)
 
     defines.push_back({ "TILE_THREADGROUPS_X", std::to_string(getThreadgroupSize((ThreadgroupSize)threadgroupSizeEnum))});
     defines.push_back({ "ENABLE_CLIPPING", clipMode == 1 ? "1" : "0" });
+    defines.push_back({ "SMOOTH_NORMALS", normalMode == 1 ? "1" : "0" });
 
     // these are destructed when the function exits.
     Shader computeProg(GL_COMPUTE_SHADER, csPath.string(), defines);
 
     std::vector<Shader*> progs = { &computeProg };
-    getTilegenShader((ClippingMode)clipMode, (ThreadgroupSize)threadgroupSizeEnum) = std::make_unique<ShaderProgram>(progs);
+    getTilegenShader((ClippingMode)clipMode, (NormalMode)normalMode, (ThreadgroupSize)threadgroupSizeEnum) = std::make_unique<ShaderProgram>(progs);
   }
 
 }
@@ -557,16 +608,18 @@ static void drawUI(GLFWwindow* window, double dt)
   snprintf(fpsStr, sizeof(fpsStr), "%d triangles", s_nTrianglesOnScreen);
   ImGui::Text(fpsStr);
 
-  ImGui::Combo("Target Mesh", &s_curMeshTarget, "Simple Cube\000Subdiv Cube (1)\000Subdiv Cube (2)\000Subdiv Cube (3)\000Subdiv Cube (4)\000Icosahedron\000Cylinder\000Sponza\0\0");
+  ImGui::Combo("Target Mesh", &s_curMeshTarget, "Simple Cube\000Subdiv Cube (1)\000Subdiv Cube (2)\000Subdiv Cube (3)\000Subdiv Cube (4)\000Icosahedron\000Smooth Icosahedron\000Smooth Icosahedron (x3)\000Cylinder\000Sponza\0\0");
   
   ImGui::Text("Rendering:");
   ImGui::BeginGroup();
   ImGui::Checkbox("Wireframe", &s_bDrawWireframe);
   ImGui::Checkbox("Draw Tessellated Mesh", &s_bDrawTessellatedMesh);
+  ImGui::Checkbox("Draw Normal Vectors", &s_bDrawNormalVectors);
 
   ImGui::Checkbox("Compute Reference Implementation", &s_bComputeReferenceImplementation);
   ImGui::BeginGroup();
   ImGui::Checkbox("Enable Clipping", &s_bEnableClipping);
+  ImGui::Checkbox("Interpolate Normals", &s_bSmoothNormals);
   ImGui::Combo("Threadgroup Size", (int*)&s_threadgroupSize, "64\000128\000256\000512\0\0");
   ImGui::EndGroup();
 

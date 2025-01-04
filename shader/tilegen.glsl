@@ -32,6 +32,10 @@ struct Triangle {
     vec3 uvToBary0; float padding2;
     vec3 uvToBary1; float padding3;
     vec3 uvToBary2; float padding4;
+
+    vec3 n0; float padding5;
+    vec3 n1; float padding6;
+    vec3 n2; float padding7;
 };
 
 layout(std430, binding = 0) buffer inputTriangleStream
@@ -82,7 +86,16 @@ void projectOntoTriangle(inout Vertex v, in Triangle tri, int iTile) {
         tri.p1 * baryCoord.y +
         tri.p2 * baryCoord.z;
 
-    v.position = finalCoord + v.position.y * tri.normal;
+    #if SMOOTH_NORMALS
+    vec3 interpNormal = normalize(
+      tri.n0 * baryCoord.x +
+      tri.n1 * baryCoord.y +
+      tri.n2 * baryCoord.z);
+    #else // !SMOOTH_NORMALS
+    vec3 interpNormal = tri.normal;
+    #endif // !SMOOTH_NORMALS
+
+    v.position = finalCoord + v.position.y * interpNormal;
 
     vec3 normalCoord = vec3(v.normal.xz, 0.0);
     vec3 baryNormal = uvToBary * normalCoord;
@@ -92,7 +105,7 @@ void projectOntoTriangle(inout Vertex v, in Triangle tri, int iTile) {
         (tri.p0 - triCenter) * baryNormal.x +
         (tri.p1 - triCenter) * baryNormal.y +
         (tri.p2 - triCenter) * baryNormal.z +
-        v.normal.y * tri.normal);
+        v.normal.y * interpNormal);
     v.normal = finalNorm;
 }
 
@@ -243,6 +256,11 @@ void main() {
     triVertex[1] = in_Triangles[iTargetTriangle].p1;
     triVertex[2] = in_Triangles[iTargetTriangle].p2;
 
+    vec3 triNormal[3];
+    triNormal[0] = in_Triangles[iTargetTriangle].n0;
+    triNormal[1] = in_Triangles[iTargetTriangle].n1;
+    triNormal[2] = in_Triangles[iTargetTriangle].n2;
+
     #if !ENABLE_CLIPPING
     for (int iTile = 0; iTile < 4; iTile++) {
         uint outBase = atomicAdd(out_baseVertex, 3);
@@ -295,7 +313,13 @@ void main() {
             vec3 planeStart = triVertex[iPlane];
             vec3 planeEnd = triVertex[(iPlane + 1) % 3];
             vec3 planeVec = normalize(planeEnd - planeStart);
-            vec3 planeNormal = normalize(cross(planeVec, in_Triangles[iTargetTriangle].normal));
+            #if SMOOTH_NORMALS
+            vec3 planeNorm = triNormal[(iPlane + 1) % 3];
+            #else // !SMOOTH_NORMALS
+            // vec3 planeNorm = in_Triangles[iTargetTriangle].normal;
+            vec3 planeNorm = triNormal[(iPlane + 1) % 3];
+            #endif // !SMOOTH_NORMALS
+            vec3 planeNormal = normalize(cross(planeVec, planeNorm));
             float planeDist = dot(planeStart, planeNormal);
             vec4 plane = vec4(planeNormal, planeDist);
 

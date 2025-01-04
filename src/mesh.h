@@ -52,7 +52,11 @@ public:
   GLuint numElements;
   std::unique_ptr<Texture> diffuseTex;
 
-  MeshPart() : VAO(0), VBO(0), EBO(0), numElements(0) { }
+  GLuint debugLine_VAO;
+  GLuint debugLine_VBO;
+  GLuint numDebugLineVerts;
+
+  MeshPart() : VAO(0), VBO(0), EBO(0), numElements(0), debugLine_VAO(0), debugLine_VBO(0), numDebugLineVerts(0) { }
   MeshPart(const MeshPartData& data);
   ~MeshPart();
 
@@ -65,6 +69,7 @@ public:
 
   void draw() const;
   void drawPatches() const;
+  void drawNormalVectors() const;
 };
 
 class TargetGeometryStream
@@ -93,6 +98,16 @@ public:
     float padding3;
     glm::vec3 uvToBary2;
     float padding4;
+
+    glm::vec3 n0;
+    float padding5;
+
+    glm::vec3 n1;
+    float padding6;
+
+    glm::vec3 n2;
+    float padding7;
+
 
     // glm::mat3 uvToBary;
   };
@@ -179,6 +194,7 @@ public:
 
   void draw() const;
   void drawPatches() const;
+  void drawNormalVectors() const;
 
   inline GLuint getTotalElements() const
   {
@@ -230,11 +246,17 @@ MeshPart::MeshPart(MeshPart&& rhs) noexcept
   , EBO(rhs.EBO)
   , numElements(rhs.numElements)
   , diffuseTex(std::move(rhs.diffuseTex))
+  , debugLine_VAO(rhs.debugLine_VAO)
+  , debugLine_VBO(rhs.debugLine_VBO)
+  , numDebugLineVerts(rhs.numDebugLineVerts)
 {
   rhs.VAO = 0;
   rhs.VBO = 0;
   rhs.EBO = 0;
   rhs.numElements = 0;
+  rhs.debugLine_VAO = 0;
+  rhs.debugLine_VBO = 0;
+  rhs.numDebugLineVerts = 0;
 }
 
 MeshPart& MeshPart::operator=(MeshPart&& rhs) noexcept
@@ -252,6 +274,15 @@ MeshPart& MeshPart::operator=(MeshPart&& rhs) noexcept
   rhs.numElements = 0;
 
   diffuseTex = std::move(rhs.diffuseTex);
+
+  debugLine_VAO = rhs.debugLine_VAO;
+  rhs.debugLine_VAO = 0;
+
+  debugLine_VBO = rhs.debugLine_VBO;
+  rhs.debugLine_VBO = 0;
+
+  numDebugLineVerts = rhs.numDebugLineVerts;
+  rhs.numDebugLineVerts = 0;
 
   return *this;
 }
