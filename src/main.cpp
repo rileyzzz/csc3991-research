@@ -181,7 +181,7 @@ void glDebugOutput(GLenum source,
   const char* message,
   const void* userParam)
 {
-  if (id == 131169 || id == 131185 || id == 131218 || id == 131204) return;
+  if (id == 131169 || id == 131185 || id == 131218 || id == 131204 || id == 131186) return;
 
   std::cout << "GL DEBUG (" << id << "): " << message << "\n";
 }
@@ -495,11 +495,11 @@ static void drawScene(void)
   //simpleMaterial->bind();
 
   // Set uniforms.
-  glUniformMatrix4fv(simpleMaterial->getUniformLocation("viewProj"), 1, GL_FALSE, glm::value_ptr(viewProj));
-  glUniform3fv(simpleMaterial->getUniformLocation("viewPos"), 1, glm::value_ptr(cameraPos));
+  glUniformMatrix4fv(texturedMaterial->getUniformLocation("viewProj"), 1, GL_FALSE, glm::value_ptr(viewProj));
+  glUniform3fv(texturedMaterial->getUniformLocation("viewPos"), 1, glm::value_ptr(cameraPos));
 
   glm::mat4 model = glm::scale(glm::mat4(1.f), glm::vec3(0.01f, 0.01f, 0.01f));
-  glUniformMatrix4fv(simpleMaterial->getUniformLocation("model"), 1, GL_FALSE, glm::value_ptr(model));
+  glUniformMatrix4fv(texturedMaterial->getUniformLocation("model"), 1, GL_FALSE, glm::value_ptr(model));
 
   //if (s_sponza)
   //{
