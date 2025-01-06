@@ -59,6 +59,29 @@ enum class ThreadgroupSize : int
   Max
 };
 
+enum class SubdivLevel : int
+{
+  Subdiv_2,
+  Subdiv_4,
+  Subdiv_8,
+  Subdiv_16,
+  Subdiv_32,
+  Subdiv_64,
+  Subdiv_128,
+
+  Count
+};
+
+const char* s_subdivLevelNames[(int)SubdivLevel::Count] = {
+  "2x",
+  "4x",
+  "8x",
+  "16x",
+  "32x",
+  "64x",
+  "128x",
+};
+
 enum class MeshTarget : int
 {
   Cube_Simple,
@@ -99,6 +122,18 @@ static GLuint getThreadgroupSize(ThreadgroupSize size)
   return 0;
 }
 
+static GLuint getSubdivLevel(SubdivLevel level)
+{
+  if (level == SubdivLevel::Subdiv_2) return 2;
+  if (level == SubdivLevel::Subdiv_4) return 4;
+  if (level == SubdivLevel::Subdiv_8) return 8;
+  if (level == SubdivLevel::Subdiv_16) return 16;
+  if (level == SubdivLevel::Subdiv_32) return 32;
+  if (level == SubdivLevel::Subdiv_64) return 64;
+  if (level == SubdivLevel::Subdiv_128) return 128;
+  return 0;
+}
+
 static std::unique_ptr<ShaderProgram> tilegen[(int)ClippingMode::Max][(int)NormalMode::Max][(int)ThreadgroupSize::Max];
 static std::unique_ptr<ShaderProgram>& getTilegenShader(ClippingMode clip, NormalMode normals, ThreadgroupSize threads)
 {
@@ -107,7 +142,10 @@ static std::unique_ptr<ShaderProgram>& getTilegenShader(ClippingMode clip, Norma
 
 static std::unique_ptr<ShaderProgram> simpleMaterial;
 static std::unique_ptr<ShaderProgram> texturedMaterial;
-static std::unique_ptr<ShaderProgram> subdivMaterial;
+
+static int s_subdivLevel = (int)SubdivLevel::Subdiv_64;
+static std::unique_ptr<ShaderProgram> subdivMaterials[(int)SubdivLevel::Count];
+
 static std::unique_ptr<ShaderProgram> lineMaterial;
 static std::unique_ptr<Texture> dispTex;
 static std::unique_ptr<GPUMeshStreams> generatedMesh;
@@ -351,6 +389,7 @@ int main()
     }
     glEndQuery(GL_TIME_ELAPSED);
 
+    const std::unique_ptr<ShaderProgram>& subdivMaterial = subdivMaterials[s_subdivLevel];
     subdivMaterial->bind();
 
     // Set uniforms.
@@ -561,14 +600,10 @@ static void loadShaders(void)
     simpleMaterial = std::make_unique<ShaderProgram>(progs);
 
     Shader subdivVert(GL_VERTEX_SHADER, subdivVertPath.string());
-    Shader tcs(GL_TESS_CONTROL_SHADER, tcsPath.string());
     Shader tev(GL_TESS_EVALUATION_SHADER, tevPath.string());
 
     Shader lineVs(GL_VERTEX_SHADER, lineVertPath.string());
     Shader lineFs(GL_FRAGMENT_SHADER, lineFragPath.string());
-
-    progs = { &subdivVert, &tcs, &tev, &frag };
-    subdivMaterial = std::make_unique<ShaderProgram>(progs);
 
     Shader texturedFrag(GL_FRAGMENT_SHADER, texturedFragPath.string());
 
@@ -577,6 +612,18 @@ static void loadShaders(void)
 
     progs = { &lineVs, &lineFs };
     lineMaterial = std::make_unique<ShaderProgram>(progs);
+
+    for (int iSubdivLevel = 0; iSubdivLevel < (int)SubdivLevel::Count; ++iSubdivLevel)
+    {
+      Shader::DefinesList defines;
+
+      defines.push_back({ "TESS_LEVEL", std::to_string(getSubdivLevel((SubdivLevel)iSubdivLevel)) });
+
+      Shader tcs(GL_TESS_CONTROL_SHADER, tcsPath.string(), defines);
+
+      progs = { &subdivVert, &tcs, &tev, &frag };
+      subdivMaterials[iSubdivLevel] = std::make_unique<ShaderProgram>(progs);
+    }
   }
 
   for (int threadgroupSizeEnum = 0; threadgroupSizeEnum < (int)ThreadgroupSize::Max; threadgroupSizeEnum++)
@@ -632,7 +679,10 @@ static void drawUI(GLFWwindow* window, double dt)
   ImGui::Text("Rendering:");
   ImGui::BeginGroup();
   ImGui::Checkbox("Wireframe", &s_bDrawWireframe);
+  
   ImGui::Checkbox("Draw Tessellated Mesh", &s_bDrawTessellatedMesh);
+  ImGui::Combo("Tessellation Level", &s_subdivLevel, s_subdivLevelNames, IM_ARRAYSIZE(s_subdivLevelNames));
+
   ImGui::Checkbox("Draw Normal Vectors", &s_bDrawNormalVectors);
 
   ImGui::Checkbox("Compute Reference Implementation", &s_bComputeReferenceImplementation);

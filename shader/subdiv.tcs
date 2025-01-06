@@ -25,12 +25,12 @@ void main()
     // invocation zero controls tessellation levels for the entire patch
     if (gl_InvocationID == 0)
     {
-        gl_TessLevelOuter[0] = 128;
-        gl_TessLevelOuter[1] = 128;
-        gl_TessLevelOuter[2] = 128;
+        gl_TessLevelOuter[0] = TESS_LEVEL;
+        gl_TessLevelOuter[1] = TESS_LEVEL;
+        gl_TessLevelOuter[2] = TESS_LEVEL;
         // gl_TessLevelOuter[3] = 16;
 
-        gl_TessLevelInner[0] = 128;
+        gl_TessLevelInner[0] = TESS_LEVEL;
         // gl_TessLevelInner[1] = 16;
     }
 }
