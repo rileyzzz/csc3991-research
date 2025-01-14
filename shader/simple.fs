@@ -14,7 +14,7 @@ void main()
   vec3 lightPos = vec3(3, 3, 3);
   vec3 objectColor = vec3(0.2, 0.2, 1.0);
 
-  float ambientStrength = 0.2;
+  float ambientStrength = 0.3;
   float specularStrength = 0.8;
   float specPower = 32.0;
 

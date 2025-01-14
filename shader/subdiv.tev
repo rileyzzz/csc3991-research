@@ -12,6 +12,24 @@ out vec4 fragPos;
 out vec3 fragNormal;
 out vec2 texCoord;
 
+// https://github.com/assimp/assimp/blob/master/code/PostProcessing/CalcTangentsProcess.cpp
+void computeBasis(vec3 p0, vec3 p1, vec3 p2, vec2 u0, vec2 u1, vec2 u2, out vec3 tangent, out vec3 bitangent)
+{
+  vec3 v = (p1 - p0);
+  vec3 w = (p2 - p0);
+  vec2 s = u1 - u0;
+  vec2 t = u2 - u0;
+
+  float dirCorrect = (t.x * s.y - t.y * s.x) < 0 ? -1 : 1;
+  if (s.x * t.y == s.y * t.x)
+  {
+    s = vec2(0, 1);
+    t = vec2(1, 0);
+  }
+
+  tangent = (w * s.y - v * t.y) * dirCorrect;
+  bitangent = (w * s.x - v * t.x) * dirCorrect;
+}
 
 void main()
 {
@@ -24,13 +42,15 @@ void main()
     vec2 t2 = tess_texCoord[2];
     texCoord = t0 * u + t1 * v + t2 * w;
 
-    float heightStrength = 0.1;
+    float heightStrength = 0.05;
     float height = texture(displacement, texCoord).r * heightStrength;
 
-    // float t = 0.01;
-    // float dx = (texture(displacement, texCoord + vec2(t, 0)).r - texture(displacement, texCoord - vec2(t, 0)).r) * heightStrength;
-    // float dy = (texture(displacement, texCoord + vec2(0, t)).r - texture(displacement, texCoord - vec2(0, t)).r) * heightStrength;
-
+    float t = 0.005;
+    float dx = ((texture(displacement, texCoord + vec2(t, 0)).r - texture(displacement, texCoord - vec2(t, 0)).r) / (2 * t)) * heightStrength;
+    // float dx = ((texture(displacement, texCoord + vec2(t, 0)).r * heightStrength - height) / t);
+    float dy = ((texture(displacement, texCoord + vec2(0, t)).r - texture(displacement, texCoord - vec2(0, t)).r) / (2 * t)) * heightStrength;
+    // float dy = ((texture(displacement, texCoord + vec2(0, t)).r * heightStrength - height) / t);
+    
     vec4 p0 = gl_in[0].gl_Position;
     vec4 p1 = gl_in[1].gl_Position;
     vec4 p2 = gl_in[2].gl_Position;
@@ -40,11 +60,27 @@ void main()
     vec3 n2 = tess_fragNormal[2];
 
     vec3 normal = normalize(n0 * u + n1 * v + n2 * w);
-    fragNormal = normal.xyz;
 
     vec4 p = p0 * u + p1 * v + p2 * w;
-
     p.xyz += normal.xyz * height;
+
+    vec3 tangent;
+    vec3 bitangent;
+    computeBasis(p0.xyz, p1.xyz, p2.xyz, t0, t1, t2, tangent, bitangent);
+    vec3 triNormal = normalize(cross(tangent, bitangent));
+    // vec3 triNormal = normal;
+
+    bitangent = normalize(cross(normal, tangent));
+    tangent = normalize(cross(bitangent, normal));
+
+    // Modify tangent basis based on displacement.
+    tangent -= triNormal * dx;
+    bitangent -= triNormal * dy;
+
+    // recalc normal
+    normal = normalize(cross(tangent, bitangent));
+
+    fragNormal = normal.xyz;
 
     fragPos = p;
     gl_Position = viewProj * p;

@@ -94,6 +94,9 @@ void projectOntoTriangle(inout Vertex v, in Triangle tri, int iTile) {
     #else // !SMOOTH_NORMALS
     vec3 interpNormal = tri.normal;
     #endif // !SMOOTH_NORMALS
+    
+    // Temp: match the displacement output
+    interpNormal *= 0.5;
 
     v.position = finalCoord + v.position.y * interpNormal;
 
