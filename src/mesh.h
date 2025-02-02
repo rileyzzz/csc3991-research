@@ -81,19 +81,20 @@ public:
     int tileBase;
 
     glm::vec3 p1;
-    int tileNum;
+    int tilesX;
 
     glm::vec3 p2;
-    float padding0;
+    int tilesY;
 
     glm::vec3 normal;
-    float padding1;
+    int tileStartX;
 
     //glm::vec3 tangent;
     //float padding2;
 
     glm::vec3 uvToBary0;
-    float padding2;
+    int tileStartY;
+    //float padding2;
     glm::vec3 uvToBary1;
     float padding3;
     glm::vec3 uvToBary2;

@@ -18,18 +18,18 @@ struct Triangle {
     int tileBase;
 
     vec3 p1;
-    int tileNum;
+    int numTilesX;
 
     vec3 p2;
-    float padding0;
+    int numTilesY;
 
     vec3 normal;
-    float padding1;
+    int tileStartX;
 
     // vec3 tangent;
     // float padding2;
 
-    vec3 uvToBary0; float padding2;
+    vec3 uvToBary0; int tileStartY; // float padding2;
     vec3 uvToBary1; float padding3;
     vec3 uvToBary2; float padding4;
 
@@ -65,16 +65,18 @@ layout(std430, binding = 4) buffer outputIndexStream
     uint out_TileIndices[];
 };
 
-void projectOntoTriangle(inout Vertex v, in Triangle tri, int iTile) {
+void projectOntoTriangle(inout Vertex v, in Triangle tri, int tileX, int tileY) {
     // vec3 bitangent = normalize(cross(tri.normal, tri.tangent));
     // mat3 tangentBasis = mat3(tri.tangent, tri.normal, bitangent);
     v.position.xz = v.position.xz * 0.5 + 0.5;
 
     // Tile test.
-    v.position.xz *= 0.5;
-    if (iTile == 0) v.position.x += 0.5;
-    if (iTile == 1) v.position.z += 0.5;
-    if (iTile == 2) v.position.xz += 0.5;
+    v.position.x += tileX;
+    v.position.z += tileY;
+    // v.position.xz *= 0.5;
+    // if (iTile == 0) v.position.x += 0.5;
+    // if (iTile == 1) v.position.z += 0.5;
+    // if (iTile == 2) v.position.xz += 0.5;
 
     mat3 uvToBary = mat3(tri.uvToBary0, tri.uvToBary1, tri.uvToBary2);
 
@@ -120,8 +122,11 @@ float planeSide(vec3 v, vec4 plane) {
 // const int CLIP_ALL_OUTSIDE = 0;
 // const int CLIP_ALL_INSIDE = 1;
 
-#define SCRATCH_VERTEX_COUNT 16
-#define SCRATCH_INDEX_COUNT 32
+// #define SCRATCH_VERTEX_COUNT 16
+// #define SCRATCH_INDEX_COUNT 32
+
+#define SCRATCH_VERTEX_COUNT 64
+#define SCRATCH_INDEX_COUNT 128
 
 int generated_baseVertex = 0;
 Vertex generated_Vertices[SCRATCH_VERTEX_COUNT];
@@ -264,17 +269,24 @@ void main() {
     triNormal[1] = in_Triangles[iTargetTriangle].n1;
     triNormal[2] = in_Triangles[iTargetTriangle].n2;
 
+    int tilesX = in_Triangles[iTargetTriangle].numTilesX;
+    int tilesY = in_Triangles[iTargetTriangle].numTilesY;
+    int tileStartX = in_Triangles[iTargetTriangle].tileStartX;
+    int tileStartY = in_Triangles[iTargetTriangle].tileStartY;
+
     #if !ENABLE_CLIPPING
-    for (int iTile = 0; iTile < 4; iTile++) {
-        uint outBase = atomicAdd(out_baseVertex, 3);
-        uint indexBase = atomicAdd(out_baseIndex, 3);
-        for (int iVert = 0; iVert < 3; iVert++)
-        {
-            uint tileIndex = in_TileIndices[iTileTriangle * 3 + iVert];
-            Vertex v = in_TileVertices[tileIndex];
-            projectOntoTriangle(v, in_Triangles[iTargetTriangle], iTile);
-            out_Vertices[outBase + iVert] = v;
-            out_TileIndices[indexBase + iVert] = outBase + iVert;
+    for (int x = 0; x < tilesX; x++) {
+        for (int y = 0; y < tilesY; y++) {
+            uint outBase = atomicAdd(out_baseVertex, 3);
+            uint indexBase = atomicAdd(out_baseIndex, 3);
+            for (int iVert = 0; iVert < 3; iVert++)
+            {
+                uint tileIndex = in_TileIndices[iTileTriangle * 3 + iVert];
+                Vertex v = in_TileVertices[tileIndex];
+                projectOntoTriangle(v, in_Triangles[iTargetTriangle], tileStartX + x, tileStartY + y);
+                out_Vertices[outBase + iVert] = v;
+                out_TileIndices[indexBase + iVert] = outBase + iVert;
+            }
         }
     }
 
@@ -282,74 +294,75 @@ void main() {
     // int out_baseIndex = in_Triangles[iTargetTriangle].tileBase * in_TileIndices.length();
 
     #else // ENABLE_CLIPPING
-    for (int iTile = 0; iTile < 4; iTile++) {
-        uint srcIdx[SCRATCH_INDEX_COUNT];
-        int numIdx = 3;
-        srcIdx[0] = in_TileIndices[iTileTriangle * 3 + 0];
-        srcIdx[1] = in_TileIndices[iTileTriangle * 3 + 1];
-        srcIdx[2] = in_TileIndices[iTileTriangle * 3 + 2];
+    for (int x = 0; x < tilesX; x++) {
+        for (int y = 0; y < tilesY; y++) {
+            uint srcIdx[SCRATCH_INDEX_COUNT];
+            int numIdx = 3;
+            srcIdx[0] = in_TileIndices[iTileTriangle * 3 + 0];
+            srcIdx[1] = in_TileIndices[iTileTriangle * 3 + 1];
+            srcIdx[2] = in_TileIndices[iTileTriangle * 3 + 2];
 
-        Vertex srcVtx[SCRATCH_VERTEX_COUNT];
-        int numVtx = 3;
-        srcVtx[0] = in_TileVertices[srcIdx[0]];
-        srcVtx[1] = in_TileVertices[srcIdx[1]];
-        srcVtx[2] = in_TileVertices[srcIdx[2]];
+            Vertex srcVtx[SCRATCH_VERTEX_COUNT];
+            int numVtx = 3;
+            srcVtx[0] = in_TileVertices[srcIdx[0]];
+            srcVtx[1] = in_TileVertices[srcIdx[1]];
+            srcVtx[2] = in_TileVertices[srcIdx[2]];
 
-        // Project the initial vertices.
-        // int iTile = 0;
-        for (int i = 0; i < numVtx; i++) {
-            projectOntoTriangle(srcVtx[i], in_Triangles[iTargetTriangle], iTile);
-        }
+            // Project the initial vertices.
+            // int iTile = 0;
+            for (int i = 0; i < numVtx; i++) {
+                projectOntoTriangle(srcVtx[i], in_Triangles[iTargetTriangle], tileStartX + x, tileStartY + y);
+            }
 
-        generated_baseVertex = numVtx;
-        generated_Vertices = srcVtx;
+            generated_baseVertex = numVtx;
+            generated_Vertices = srcVtx;
 
-        numIdx = 3;
-        for (int i = 0; i < 3; i++)
-            srcIdx[i] = i;
-        
-        // Clip the index list, adding vertices where needed.
-        for (int iPlane = 0; iPlane < 3; iPlane++) {
-            generated_baseIndex = 0;
-            // generated_baseVertex = 0;
+            numIdx = 3;
+            for (int i = 0; i < 3; i++)
+                srcIdx[i] = i;
             
-            vec3 planeStart = triVertex[iPlane];
-            vec3 planeEnd = triVertex[(iPlane + 1) % 3];
-            vec3 planeVec = normalize(planeEnd - planeStart);
-            #if SMOOTH_NORMALS
-            vec3 planeNorm = triNormal[(iPlane + 1) % 3];
-            #else // !SMOOTH_NORMALS
-            // vec3 planeNorm = in_Triangles[iTargetTriangle].normal;
-            vec3 planeNorm = triNormal[(iPlane + 1) % 3];
-            #endif // !SMOOTH_NORMALS
-            vec3 planeNormal = normalize(cross(planeVec, planeNorm));
-            float planeDist = dot(planeStart, planeNormal);
-            vec4 plane = vec4(planeNormal, planeDist);
+            // Clip the index list, adding vertices where needed.
+            for (int iPlane = 0; iPlane < 3; iPlane++) {
+                generated_baseIndex = 0;
+                // generated_baseVertex = 0;
+                
+                vec3 planeStart = triVertex[iPlane];
+                vec3 planeEnd = triVertex[(iPlane + 1) % 3];
+                vec3 planeVec = normalize(planeEnd - planeStart);
+                #if SMOOTH_NORMALS
+                vec3 planeNorm = triNormal[(iPlane + 1) % 3];
+                #else // !SMOOTH_NORMALS
+                // vec3 planeNorm = in_Triangles[iTargetTriangle].normal;
+                vec3 planeNorm = triNormal[(iPlane + 1) % 3];
+                #endif // !SMOOTH_NORMALS
+                vec3 planeNormal = normalize(cross(planeVec, planeNorm));
+                float planeDist = dot(planeStart, planeNormal);
+                vec4 plane = vec4(planeNormal, planeDist);
 
-            // vec4 plane = vec4(0, 1, 0, -0.75);
-            clipMeshToPlane(srcIdx, numIdx, plane);
+                // vec4 plane = vec4(0, 1, 0, -0.75);
+                clipMeshToPlane(srcIdx, numIdx, plane);
 
-            // Copy new geometry.
-            srcIdx = generated_Indices;
-            numIdx = generated_baseIndex;
+                // Copy new geometry.
+                srcIdx = generated_Indices;
+                numIdx = generated_baseIndex;
+            }
+
+            // Push new geometry.
+            uint outBase = atomicAdd(out_baseVertex, generated_baseVertex);
+            for (int i = 0; i < generated_baseVertex; i++)
+            {
+                // out_Vertices[outBase + i] = generated_Vertices[i];
+
+                Vertex test = generated_Vertices[i];
+                // test.position += in_Triangles[iTargetTriangle].normal * 0.1;
+                // test.position += normalize(in_Triangles[iTargetTriangle].p1 - in_Triangles[iTargetTriangle].p0) * 0.1;
+                out_Vertices[outBase + i] = test;
+            }
+            
+            uint indexBase = atomicAdd(out_baseIndex, generated_baseIndex);
+            for (int i = 0; i < generated_baseIndex; i++)
+                out_TileIndices[indexBase + i] = outBase + generated_Indices[i];
         }
-
-        // Push new geometry.
-        uint outBase = atomicAdd(out_baseVertex, generated_baseVertex);
-        for (int i = 0; i < generated_baseVertex; i++)
-        {
-            // out_Vertices[outBase + i] = generated_Vertices[i];
-
-            Vertex test = generated_Vertices[i];
-            // test.position += in_Triangles[iTargetTriangle].normal * 0.1;
-            // test.position += normalize(in_Triangles[iTargetTriangle].p1 - in_Triangles[iTargetTriangle].p0) * 0.1;
-            out_Vertices[outBase + i] = test;
-        }
-        
-        uint indexBase = atomicAdd(out_baseIndex, generated_baseIndex);
-        for (int i = 0; i < generated_baseIndex; i++)
-            out_TileIndices[indexBase + i] = outBase + generated_Indices[i];
-
     }
     #endif // ENABLE_CLIPPING
 }

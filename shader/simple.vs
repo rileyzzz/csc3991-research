@@ -10,7 +10,7 @@ out vec2 texCoord;
 uniform mat4 viewProj;
 uniform mat4 model;
 
-uniform sampler2D displacement;
+// uniform sampler2D displacement;
 
 void main()
 {
@@ -22,9 +22,9 @@ void main()
 	float heightStrength = 0.1;
 
 	// Perturb the normal.
-	float h = 0.001;
-	float dx = (texture(displacement, vUV + vec2(h, 0)).r - texture(displacement, vUV - vec2(h, 0)).r) / (2*h) * heightStrength;
-	float dy = (texture(displacement, vUV + vec2(0, h)).r - texture(displacement, vUV - vec2(0, h)).r) / (2*h) * heightStrength;
+	// float h = 0.001;
+	// float dx = (texture(displacement, vUV + vec2(h, 0)).r - texture(displacement, vUV - vec2(h, 0)).r) / (2*h) * heightStrength;
+	// float dy = (texture(displacement, vUV + vec2(0, h)).r - texture(displacement, vUV - vec2(0, h)).r) / (2*h) * heightStrength;
 
 	vec3 upVector = vec3(0, 0, 1);
 
@@ -37,9 +37,9 @@ void main()
 
 	// fragNormal = normalize(tbn * vec3(-dx, -dy, 1));
 	// fragNormal = normalize(tbn * vec3(0, 0, 1));
-  // fragNormal = vec3(dx, dy, 0);
+	// fragNormal = vec3(dx, dy, 0);
 
-	fragPos.xyz += vNormal * texture(displacement, vUV).r * heightStrength;
+	// fragPos.xyz += vNormal * texture(displacement, vUV).r * heightStrength;
 
 	gl_Position = viewProj * model * fragPos;
 }

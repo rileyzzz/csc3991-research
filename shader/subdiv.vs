@@ -18,9 +18,9 @@ void main()
 	fragNormal = vNormal;
 
 
-	// texCoord = vUV;
+	texCoord = vUV;
 	// Hack to match compute shader tiling.
-	texCoord = vUV * 2;
+	// texCoord = vUV * 2;
 
 	// float heightStrength = 0.1;
 

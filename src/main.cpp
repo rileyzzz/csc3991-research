@@ -150,7 +150,7 @@ static std::unique_ptr<ShaderProgram> lineMaterial;
 static std::unique_ptr<Texture> dispTex;
 static std::unique_ptr<GPUMeshStreams> generatedMesh;
 
-//static std::unique_ptr<Mesh> s_sponza;
+static std::unique_ptr<Mesh> s_sponza;
 static int s_curMeshTarget = (int)MeshTarget::Cube_2;
 static std::vector<std::unique_ptr<TargetMesh>> s_meshTarget;
 static std::vector<std::unique_ptr<Mesh>> s_tessellationTarget;
@@ -162,6 +162,7 @@ static bool s_bDrawWireframe = false;
 static bool s_bDrawTessellatedMesh = true;
 static bool s_bDrawNormalVectors = false;
 static bool s_bComputeReferenceImplementation = false;
+static bool s_bOneTimeCompute = false;
 static bool s_bEnableClipping = true;
 static bool s_bSmoothNormals = false;
 static ThreadgroupSize s_threadgroupSize = ThreadgroupSize::Threads_256;
@@ -303,7 +304,7 @@ int main()
   auto tile = loadTileMesh("tile_brick.obj");
   //auto monkey = loadMesh("cube.obj");
   //auto monkey = loadMesh("cube_simple.obj");
-  //s_sponza = loadMesh("sponza/sponza.obj");
+  s_sponza = loadMesh("sponza/sponza_no_bricks_scaled.obj");
 
   s_meshTarget.resize((int)MeshTarget::Count);
   s_meshTarget[(int)MeshTarget::Cube_Simple] = loadTargetMesh("cube_simple.obj");
@@ -316,6 +317,7 @@ int main()
   s_meshTarget[(int)MeshTarget::SmoothIco3] = loadTargetMesh("smooth_ico_x3.obj");
   s_meshTarget[(int)MeshTarget::Cylinder] = loadTargetMesh("cylinder.obj");
   s_meshTarget[(int)MeshTarget::SmoothCylinder] = loadTargetMesh("cylinder_smooth.obj");
+  s_meshTarget[(int)MeshTarget::Sponza] = loadTargetMesh("sponza/sponza_bricks_scaled.obj");
 
   s_tessellationTarget.resize((int)MeshTarget::Count);
   s_tessellationTarget[(int)MeshTarget::Cube_Simple] = loadMesh("cube_simple.obj");
@@ -328,9 +330,10 @@ int main()
   s_tessellationTarget[(int)MeshTarget::SmoothIco3] = loadMesh("smooth_ico_x3.obj");
   s_tessellationTarget[(int)MeshTarget::Cylinder] = loadMesh("cylinder.obj");
   s_tessellationTarget[(int)MeshTarget::SmoothCylinder] = loadMesh("cylinder_smooth.obj");
+  s_tessellationTarget[(int)MeshTarget::Sponza] = loadMesh("sponza/sponza_bricks_scaled.obj");
 
 
-  const int maxVertices = 1024 * 128 * 128;
+  const int maxVertices = 1024 * 128 * 128 * 4;
   const int maxIndices = 3 * maxVertices;
   generatedMesh = std::make_unique<GPUMeshStreams>(maxVertices, maxIndices);
 
@@ -383,9 +386,10 @@ int main()
 
     // Compute phase.
     glBeginQuery(GL_TIME_ELAPSED, s_glQueries[(int)GLQuery::ComputeTime]);
-    if (s_bComputeReferenceImplementation && curTarget)
+    if ((s_bComputeReferenceImplementation || s_bOneTimeCompute) && curTarget)
     {
       generateSurfaceGeometry(*curTarget, *tile);
+      s_bOneTimeCompute = false;
     }
     glEndQuery(GL_TIME_ELAPSED);
 
@@ -530,6 +534,9 @@ static void generateSurfaceGeometry(const TargetMesh& target, const TileMesh& ti
 
 static void drawScene(void)
 {
+  if (s_curMeshTarget != (int)MeshTarget::Sponza)
+    return;
+
   texturedMaterial->bind();
   //simpleMaterial->bind();
 
@@ -537,13 +544,14 @@ static void drawScene(void)
   glUniformMatrix4fv(texturedMaterial->getUniformLocation("viewProj"), 1, GL_FALSE, glm::value_ptr(viewProj));
   glUniform3fv(texturedMaterial->getUniformLocation("viewPos"), 1, glm::value_ptr(cameraPos));
 
-  glm::mat4 model = glm::scale(glm::mat4(1.f), glm::vec3(0.01f, 0.01f, 0.01f));
+  //glm::mat4 model = glm::scale(glm::mat4(1.f), glm::vec3(0.01f, 0.01f, 0.01f));
+  glm::mat4 model = glm::mat4(1.f);
   glUniformMatrix4fv(texturedMaterial->getUniformLocation("model"), 1, GL_FALSE, glm::value_ptr(model));
 
-  //if (s_sponza)
-  //{
-  //  s_sponza->draw();
-  //}
+  if (s_sponza)
+  {
+    s_sponza->draw();
+  }
 }
 
 static void drawLines(Mesh* mesh)
@@ -685,7 +693,12 @@ static void drawUI(GLFWwindow* window, double dt)
 
   ImGui::Checkbox("Draw Normal Vectors", &s_bDrawNormalVectors);
 
-  ImGui::Checkbox("Compute Reference Implementation", &s_bComputeReferenceImplementation);
+  if (ImGui::Button("Generate Tilemesh"))
+  {
+    s_bOneTimeCompute = true;
+  }
+  ImGui::Checkbox("Generate per-frame", &s_bComputeReferenceImplementation);
+
   ImGui::BeginGroup();
   ImGui::Checkbox("Enable Clipping", &s_bEnableClipping);
   ImGui::Checkbox("Interpolate Normals", &s_bSmoothNormals);

@@ -306,10 +306,28 @@ TargetGeometryStream::TargetGeometryStream(const MeshPartData& data)
     stream[i].n2 = glm::normalize(v2.normal);
 
     // TODO: factor in area in compute shader.
-    int numTiles = 4;
+    const float tileWidth = 1.0f;
+    const float tileHeight = 1.0f;
+    glm::vec2 uvMin = glm::min(glm::min(v0.uv, v1.uv), v2.uv);
+    glm::vec2 uvMax = glm::max(glm::max(v0.uv, v1.uv), v2.uv);
+
+    int startX = (int)(uvMin.x / tileWidth);
+    int endX = (int)(uvMax.x / tileWidth + 0.99f);
+    int startY = (int)(uvMin.y / tileWidth);
+    int endY = (int)(uvMax.y / tileWidth + 0.99f);
+
+    int numTilesX = endX - startX;
+    int numTilesY = endY - startY;
+    //numTilesX = 1;
+    //numTilesY = 1;
+
+    int numTiles = numTilesX * numTilesY;
 
     stream[i].tileBase = tileBase;
-    stream[i].tileNum = numTiles;
+    stream[i].tilesX = numTilesX;
+    stream[i].tilesY = numTilesY;
+    stream[i].tileStartX = startX;
+    stream[i].tileStartY = startY;
     tileBase += numTiles;
   }
 
