@@ -43,6 +43,8 @@ void main()
     texCoord = t0 * u + t1 * v + t2 * w;
 
     float heightStrength = 0.05;
+    // flip uv
+    texCoord.y = 1 - texCoord.y;
     float height = texture(displacement, texCoord).r * heightStrength;
 
     float t = 0.005;
