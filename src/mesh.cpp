@@ -357,6 +357,10 @@ TileGeometryStreams::TileGeometryStreams(const MeshPartData& data)
   {
     v.position = data.vtx[i].position;
     v.normal = data.vtx[i].normal;
+    #ifdef TILEMESH_UVS
+    v.uv = data.vtx[i].uv;
+    #endif // TILEMESH_UVS
+
     vertices[i] = v;
   }
 
@@ -403,7 +407,7 @@ GPUMeshStreams::GPUMeshStreams(size_t maxVerts, size_t maxIndices)
   // position
   size = 3 * sizeof(float);
   glEnableVertexAttribArray(0);
-  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(MeshVertex), (void*)offset);
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(MeshVertexPadded), (void*)offset);
   offset += size;
 
   // padding.
@@ -412,8 +416,20 @@ GPUMeshStreams::GPUMeshStreams(size_t maxVerts, size_t maxIndices)
   // normal
   size = 3 * sizeof(float);
   glEnableVertexAttribArray(1);
-  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(MeshVertex), (void*)offset);
+  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(MeshVertexPadded), (void*)offset);
   offset += size;
+
+  // padding.
+  offset += sizeof(float);
+
+  #ifdef TILEMESH_UVS
+  // uv
+  size = 2 * sizeof(float);
+  glEnableVertexAttribArray(2);
+  glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(MeshVertexPadded), (void*)offset);
+  offset += size;
+  #endif // TILEMESH_UVS
+
 
   glBindVertexArray(0);
 

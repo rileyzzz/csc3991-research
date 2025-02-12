@@ -8,11 +8,26 @@
 #include <memory>
 #include "texture.h"
 
+#define TILEMESH_UVS
+
 struct MeshVertex
 {
   glm::vec3 position;
   glm::vec3 normal;
   glm::vec2 uv;
+};
+
+struct MeshVertexPadded
+{
+  glm::vec3 position;
+  float padding0;
+
+  glm::vec3 normal;
+  float padding1;
+
+  glm::vec2 uv;
+  float padding2;
+  float padding3;
 };
 
 struct MeshIndexKey
@@ -133,18 +148,24 @@ public:
 class TileGeometryStreams
 {
 protected:
+
+  GLuint VertexStream;
+  GLuint IndexStream;
+
+public:
   struct Vertex
   {
     glm::vec3 position;
     float padding0;
     glm::vec3 normal;
     float padding1;
+#ifdef TILEMESH_UVS
+    glm::vec2 uv;
+    float padding2;
+    float padding3;
+#endif // TILEMESH_UVS
   };
 
-  GLuint VertexStream;
-  GLuint IndexStream;
-
-public:
   TileGeometryStreams() : VertexStream(0), IndexStream(0) { }
   TileGeometryStreams(const MeshPartData& data);
   ~TileGeometryStreams();

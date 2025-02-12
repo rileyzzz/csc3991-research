@@ -1,15 +1,25 @@
 
 layout (local_size_x = TILE_THREADGROUPS_X, local_size_y = 1, local_size_z = 1) in;
 
+#define TILEMESH_UVS
+
 struct Vertex {
     vec3 position;
     vec3 normal;
+#ifdef TILEMESH_UVS
+    vec2 uv;
+#endif //TILEMESH_UVS
 };
 
 Vertex lerpVertex(Vertex a, Vertex b, float t) {
     Vertex v;
     v.position = mix(a.position, b.position, t);
     v.normal = normalize(mix(a.normal, b.normal, t));
+
+    #ifdef TILEMESH_UVS
+    v.uv = mix(a.uv, b.uv, t);
+    #endif // TILEMESH_UVS
+
     return v;
 }
 
@@ -69,6 +79,9 @@ void projectOntoTriangle(inout Vertex v, in Triangle tri, int tileX, int tileY) 
     // vec3 bitangent = normalize(cross(tri.normal, tri.tangent));
     // mat3 tangentBasis = mat3(tri.tangent, tri.normal, bitangent);
     v.position.xz = v.position.xz * 0.5 + 0.5;
+    
+    // flip uvs.
+    // v.uv.y = 1 - v.uv.y;
 
     // Tile test.
     v.position.x += tileX;

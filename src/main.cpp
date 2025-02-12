@@ -113,6 +113,19 @@ const char* s_meshTargetNames[(int)MeshTarget::Count] = {
   "Sponza"
 };
 
+enum class TileMeshes : int
+{
+  Brick,
+  Sponza,
+
+  Count
+};
+
+const char* s_tileMeshNames[(int)TileMeshes::Count] = {
+  "Brick",
+  "Sponza"
+};
+
 static GLuint getThreadgroupSize(ThreadgroupSize size)
 {
   if (size == ThreadgroupSize::Threads_64) return 64;
@@ -145,15 +158,19 @@ static std::unique_ptr<ShaderProgram> texturedMaterial;
 
 static int s_subdivLevel = (int)SubdivLevel::Subdiv_64;
 static std::unique_ptr<ShaderProgram> subdivMaterials[(int)SubdivLevel::Count];
+static std::unique_ptr<ShaderProgram> texturedSubdivMaterials[(int)SubdivLevel::Count];
 
 static std::unique_ptr<ShaderProgram> lineMaterial;
-static std::unique_ptr<Texture> dispTex;
 static std::unique_ptr<GPUMeshStreams> generatedMesh;
 
 static std::unique_ptr<Mesh> s_sponza;
 static int s_curMeshTarget = (int)MeshTarget::Cube_2;
+static int s_curTilemesh = (int)TileMeshes::Brick;
 static std::vector<std::unique_ptr<TargetMesh>> s_meshTarget;
 static std::vector<std::unique_ptr<Mesh>> s_tessellationTarget;
+static std::vector<std::unique_ptr<TileMesh>> s_tileMeshes;
+static std::vector<std::unique_ptr<Texture>> s_tileDiffTextures;
+static std::vector<std::unique_ptr<Texture>> s_tileDispTextures;
 
 //static std::unique_ptr<StorageBuffer> outputVertices;
 //static std::unique_ptr<StorageBuffer> outputIndices;
@@ -298,12 +315,18 @@ int main()
   // Load shaders.
   loadShaders();
 
-  //auto target = loadTargetMesh("cube_simple.obj");
-  //auto target = loadTargetMesh("test_ico.obj");
-  //auto target = loadTargetMesh("test_torus.obj");
-  auto tile = loadTileMesh("tile_brick.obj");
-  //auto monkey = loadMesh("cube.obj");
-  //auto monkey = loadMesh("cube_simple.obj");
+  s_tileMeshes.resize((int)TileMeshes::Count);
+  s_tileDiffTextures.resize((int)TileMeshes::Count);
+  s_tileDispTextures.resize((int)TileMeshes::Count);
+
+  s_tileMeshes[(int)TileMeshes::Brick] = loadTileMesh("tile_brick.obj");
+  s_tileDiffTextures[(int)TileMeshes::Brick] = nullptr;
+  s_tileDispTextures[(int)TileMeshes::Brick] = std::make_unique<Texture>((std::filesystem::path(SCENE_DIR) / "brick.jpg").string());
+
+  s_tileMeshes[(int)TileMeshes::Sponza] = loadTileMesh("sponza_brick.obj");
+  s_tileDiffTextures[(int)TileMeshes::Sponza] = std::make_unique<Texture>((std::filesystem::path(SCENE_DIR) / "sponza/textures/spnza_bricks_a_diff.png").string());
+  s_tileDispTextures[(int)TileMeshes::Sponza] = std::make_unique<Texture>((std::filesystem::path(SCENE_DIR) / "sponza/textures/spnza_bricks_a_bump.png").string());
+
   s_sponza = loadMesh("sponza/sponza_no_bricks_scaled.obj");
 
   s_meshTarget.resize((int)MeshTarget::Count);
@@ -336,8 +359,6 @@ int main()
   const int maxVertices = 1024 * 128 * 128 * 4;
   const int maxIndices = 3 * maxVertices;
   generatedMesh = std::make_unique<GPUMeshStreams>(maxVertices, maxIndices);
-
-  dispTex = std::make_unique<Texture>((std::filesystem::path(SCENE_DIR) / "brick.jpg").string());
 
   // Setup.
   glEnable(GL_DEPTH_TEST);
@@ -378,41 +399,65 @@ int main()
 
     TargetMesh* curTarget = nullptr;
     Mesh* tessellateMesh = nullptr;
+    TileMesh* curTile = nullptr;
+    Texture* tileDiffTex = nullptr;
+    Texture* tileDispTex = nullptr;
     if (s_curMeshTarget >= 0 && s_curMeshTarget < (int)MeshTarget::Count)
     {
       curTarget = s_meshTarget[s_curMeshTarget].get();
       tessellateMesh = s_tessellationTarget[s_curMeshTarget].get();
     }
 
+    if (s_curTilemesh >= 0 && s_curTilemesh < (int)TileMeshes::Count)
+    {
+      curTile = s_tileMeshes[s_curTilemesh].get();
+      tileDiffTex = s_tileDiffTextures[s_curTilemesh].get();
+      tileDispTex = s_tileDispTextures[s_curTilemesh].get();
+    }
+
     // Compute phase.
     glBeginQuery(GL_TIME_ELAPSED, s_glQueries[(int)GLQuery::ComputeTime]);
-    if ((s_bComputeReferenceImplementation || s_bOneTimeCompute) && curTarget)
+    if ((s_bComputeReferenceImplementation || s_bOneTimeCompute) && curTarget && curTile)
     {
-      generateSurfaceGeometry(*curTarget, *tile);
+      generateSurfaceGeometry(*curTarget, *curTile);
       s_bOneTimeCompute = false;
     }
     glEndQuery(GL_TIME_ELAPSED);
 
-    const std::unique_ptr<ShaderProgram>& subdivMaterial = subdivMaterials[s_subdivLevel];
-    subdivMaterial->bind();
-
-    // Set uniforms.
-    glm::mat4 model(1.f);
-    glUniformMatrix4fv(subdivMaterial->getUniformLocation("viewProj"), 1, GL_FALSE, glm::value_ptr(viewProj));
-    glUniformMatrix4fv(subdivMaterial->getUniformLocation("model"), 1, GL_FALSE, glm::value_ptr(model));
-    glUniform3fv(subdivMaterial->getUniformLocation("viewPos"), 1, glm::value_ptr(cameraPos));
-
-    glActiveTexture(GL_TEXTURE0);
-    dispTex->bind();
-
-    glBeginQuery(GL_TIME_ELAPSED, s_glQueries[(int)GLQuery::TessellationRenderTime]);
-    glBeginQuery(GL_PRIMITIVES_GENERATED, s_glQueries[(int)GLQuery::TessellationTriangles]);
-    if (s_bDrawTessellatedMesh && tessellateMesh)
+    const ShaderProgram* curSubdivMaterial = tileDiffTex ? texturedSubdivMaterials[s_subdivLevel].get() : subdivMaterials[s_subdivLevel].get();
+    if (curSubdivMaterial)
     {
-      tessellateMesh->drawPatches();
+      curSubdivMaterial->bind();
+
+      // Set uniforms.
+      glm::mat4 model(1.f);
+      glUniformMatrix4fv(curSubdivMaterial->getUniformLocation("viewProj"), 1, GL_FALSE, glm::value_ptr(viewProj));
+      glUniformMatrix4fv(curSubdivMaterial->getUniformLocation("model"), 1, GL_FALSE, glm::value_ptr(model));
+      glUniform3fv(curSubdivMaterial->getUniformLocation("viewPos"), 1, glm::value_ptr(cameraPos));
+
+      glUniform1i(curSubdivMaterial->getUniformLocation("diffuse"), 0);
+      if (tileDiffTex)
+      {
+        glActiveTexture(GL_TEXTURE0);
+        tileDiffTex->bind();
+      }
+
+      glUniform1i(curSubdivMaterial->getUniformLocation("displacement"), 1);
+      if (tileDispTex)
+      {
+        glActiveTexture(GL_TEXTURE1);
+        tileDispTex->bind();
+      }
+
+      glBeginQuery(GL_TIME_ELAPSED, s_glQueries[(int)GLQuery::TessellationRenderTime]);
+      glBeginQuery(GL_PRIMITIVES_GENERATED, s_glQueries[(int)GLQuery::TessellationTriangles]);
+      if (s_bDrawTessellatedMesh && tessellateMesh)
+      {
+        tessellateMesh->drawPatches();
+      }
+      glEndQuery(GL_TIME_ELAPSED);
+      glEndQuery(GL_PRIMITIVES_GENERATED);
     }
-    glEndQuery(GL_TIME_ELAPSED);
-    glEndQuery(GL_PRIMITIVES_GENERATED);
 
     drawScene();
 
@@ -421,32 +466,41 @@ int main()
       drawLines(tessellateMesh);
     }
 
-    simpleMaterial->bind();
+    ShaderProgram* generatedTileMat = tileDiffTex ? texturedMaterial.get() : simpleMaterial.get();
 
-    // Set uniforms.
-    glUniformMatrix4fv(simpleMaterial->getUniformLocation("viewProj"), 1, GL_FALSE, glm::value_ptr(viewProj));
-    glUniform3fv(simpleMaterial->getUniformLocation("viewPos"), 1, glm::value_ptr(cameraPos));
-
-    glActiveTexture(GL_TEXTURE0);
-    dispTex->bind();
-
-    model = glm::mat4(1.f);
-    glUniformMatrix4fv(simpleMaterial->getUniformLocation("model"), 1, GL_FALSE, glm::value_ptr(model));
-
-    // TODO: send this indirectly!
-    GLuint numGenerated = generatedMesh->getNumGeneratedElements();
-
-    // Render the generated mesh.
-    glBeginQuery(GL_TIME_ELAPSED, s_glQueries[(int)GLQuery::TilemeshRenderTime]);
-    if (s_bDrawReferenceImplementation && curTarget)
+    if (generatedTileMat)
     {
-      int numSurfaceTris = curTarget->numTriangles();
-      int maxSurfaceIndices = tile->getNumIndices() * 4 * numSurfaceTris;
+      generatedTileMat->bind();
 
-      //generatedMesh->draw(maxSurfaceIndices);
-      generatedMesh->draw(numGenerated);
+      // Set uniforms.
+      glUniformMatrix4fv(generatedTileMat->getUniformLocation("viewProj"), 1, GL_FALSE, glm::value_ptr(viewProj));
+      glUniform3fv(generatedTileMat->getUniformLocation("viewPos"), 1, glm::value_ptr(cameraPos));
+
+      glUniform1i(generatedTileMat->getUniformLocation("tex"), 0);
+      if (tileDiffTex)
+      {
+        glActiveTexture(GL_TEXTURE0);
+        tileDiffTex->bind();
+      }
+
+      glm::mat4 model = glm::mat4(1.f);
+      glUniformMatrix4fv(generatedTileMat->getUniformLocation("model"), 1, GL_FALSE, glm::value_ptr(model));
+
+      // TODO: send this indirectly!
+      GLuint numGenerated = generatedMesh->getNumGeneratedElements();
+
+      // Render the generated mesh.
+      glBeginQuery(GL_TIME_ELAPSED, s_glQueries[(int)GLQuery::TilemeshRenderTime]);
+      if (s_bDrawReferenceImplementation && curTarget && curTile)
+      {
+        int numSurfaceTris = curTarget->numTriangles();
+        int maxSurfaceIndices = curTile->getNumIndices() * 4 * numSurfaceTris;
+
+        //generatedMesh->draw(maxSurfaceIndices);
+        generatedMesh->draw(numGenerated);
+      }
+      glEndQuery(GL_TIME_ELAPSED);
     }
-    glEndQuery(GL_TIME_ELAPSED);
 
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
@@ -631,6 +685,9 @@ static void loadShaders(void)
 
       progs = { &subdivVert, &tcs, &tev, &frag };
       subdivMaterials[iSubdivLevel] = std::make_unique<ShaderProgram>(progs);
+
+      progs = { &subdivVert, &tcs, &tev, &texturedFrag };
+      texturedSubdivMaterials[iSubdivLevel] = std::make_unique<ShaderProgram>(progs);
     }
   }
 
@@ -683,7 +740,8 @@ static void drawUI(GLFWwindow* window, double dt)
   ImGui::Text(fpsStr);
 
   ImGui::Combo("Target Mesh", &s_curMeshTarget, s_meshTargetNames, IM_ARRAYSIZE(s_meshTargetNames));
-  
+  ImGui::Combo("Tilemesh", &s_curTilemesh, s_tileMeshNames, IM_ARRAYSIZE(s_tileMeshNames));
+
   ImGui::Text("Rendering:");
   ImGui::BeginGroup();
   ImGui::Checkbox("Wireframe", &s_bDrawWireframe);

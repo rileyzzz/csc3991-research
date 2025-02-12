@@ -30,8 +30,16 @@ void main()
   float spec = pow(max(dot(vecToView, reflectDir), 0.0), specPower);
   vec3 specular = specularStrength * spec * lightColor;  
 
-  objectColor = texture(tex, texCoord).rgb;
-  
+  // flip uvs.
+  vec2 uv = texCoord;
+  uv.y = 1 - uv.y;
+
+  objectColor = texture(tex, uv).rgb;
+  float alpha = texture(tex, uv).a;
+
+  if (alpha < 0.3)
+    discard;
+
   vec3 result = (ambient + diffuse + specular) * objectColor;
 
   FragColor = vec4(result, 1);
