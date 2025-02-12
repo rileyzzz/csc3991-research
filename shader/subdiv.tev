@@ -40,11 +40,13 @@ void main()
     vec2 t0 = tess_texCoord[0];
     vec2 t1 = tess_texCoord[1];
     vec2 t2 = tess_texCoord[2];
+
     texCoord = t0 * u + t1 * v + t2 * w;
 
-    float heightStrength = 0.05;
     // flip uv
-    texCoord.y = 1 - texCoord.y;
+    // texCoord.y = 1 - texCoord.y;
+
+    float heightStrength = 0.05;
     float height = texture(displacement, texCoord).r * heightStrength;
 
     float t = 0.005;
@@ -53,6 +55,9 @@ void main()
     float dy = ((texture(displacement, texCoord + vec2(0, t)).r - texture(displacement, texCoord - vec2(0, t)).r) / (2 * t)) * heightStrength;
     // float dy = ((texture(displacement, texCoord + vec2(0, t)).r * heightStrength - height) / t);
     
+    // flip uv
+    // dy *= -1;
+
     vec4 p0 = gl_in[0].gl_Position;
     vec4 p1 = gl_in[1].gl_Position;
     vec4 p2 = gl_in[2].gl_Position;

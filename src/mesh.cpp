@@ -237,7 +237,11 @@ static void loadParts(tinyobj::ObjReader& reader, std::vector<MeshPartData>& par
           if (idx.texcoord_index >= 0) {
             tinyobj::real_t tx = attrib.texcoords[2 * size_t(idx.texcoord_index) + 0];
             tinyobj::real_t ty = attrib.texcoords[2 * size_t(idx.texcoord_index) + 1];
-            vertex.uv = glm::vec2(tx, ty);
+
+            //vertex.uv = glm::vec2(tx, ty);
+
+            // flip uv
+            vertex.uv = glm::vec2(tx, 1.0f - ty);
           }
 
           // Optional: vertex colors

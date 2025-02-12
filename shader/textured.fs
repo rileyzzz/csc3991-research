@@ -32,7 +32,7 @@ void main()
 
   // flip uvs.
   vec2 uv = texCoord;
-  uv.y = 1 - uv.y;
+  // uv.y = 1 - uv.y;
 
   objectColor = texture(tex, uv).rgb;
   float alpha = texture(tex, uv).a;
