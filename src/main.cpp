@@ -20,6 +20,10 @@
 #include "backends/imgui_impl_opengl3.h"
 #include "implot.h"
 
+// stbi_write
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
+
 static glm::mat4 proj;
 static glm::mat4 view;
 static glm::mat4 viewProj;
@@ -185,6 +189,7 @@ static bool s_bSmoothNormals = false;
 static ThreadgroupSize s_threadgroupSize = ThreadgroupSize::Threads_256;
 static bool s_bDrawReferenceImplementation = false;
 static int s_nTrianglesOnScreen = 0;
+static bool s_bTakeScreenshot = false;
 
 enum class GLQuery
 {
@@ -212,6 +217,7 @@ static void loadShaders(void);
 static void drawUI(GLFWwindow* window, double dt);
 static void updateInput(GLFWwindow* window, float dt);
 static void updateCamera(GLFWwindow* window);
+static void saveScreenshot(GLFWwindow* window);
 
 static void generateSurfaceGeometry(const TargetMesh& target, const TileMesh& tile);
 static void drawScene(void);
@@ -506,7 +512,11 @@ int main()
 
 
     ImGui::Render();
-    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+    if (!s_bTakeScreenshot)
+    {
+      ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+    }
 
     // Analyze framedata.
     GLuint64 computeTime = 0;
@@ -540,6 +550,13 @@ int main()
     if (s_bDrawTessellatedMesh)
     {
       s_nTrianglesOnScreen += tesselationTris;
+    }
+
+
+    if (s_bTakeScreenshot)
+    {
+      s_bTakeScreenshot = false;
+      saveScreenshot(window);
     }
 
     glfwSwapBuffers(window);
@@ -792,6 +809,10 @@ static void drawUI(GLFWwindow* window, double dt)
     }
   }
 
+  if (ImGui::Button("Screenshot"))
+  {
+    s_bTakeScreenshot = true;
+  }
 
   ImGui::End();
 }
@@ -868,4 +889,34 @@ static void updateCamera(GLFWwindow* window)
   cameraPos = glm::vec3(view[3]);
   cameraForward = glm::vec3(view * glm::vec4(0, 0, -1, 0));
   cameraRight = glm::vec3(view * glm::vec4(1, 0, 0, 0));
+}
+
+static void saveScreenshot(GLFWwindow* window)
+{
+  int w, h;
+  glfwGetWindowSize(window, &w, &h);
+  if (w == 0 || h == 0)
+    return;
+
+  std::string screenshotDir = (std::filesystem::path(SCENE_DIR) / "../screenshots").string();
+  if (!std::filesystem::is_directory(screenshotDir))
+  {
+    std::filesystem::create_directory(screenshotDir);
+  }
+
+  std::string path;
+  int index = 0;
+  do {
+    path = (std::filesystem::path(screenshotDir) / std::format("img_{}.png", index++)).string();
+  } while (std::filesystem::exists(path));
+
+  void* pixBuf = malloc(w * h * 4);
+  glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, pixBuf);
+
+  int pitch = w * 4;
+  stbi_flip_vertically_on_write(true);
+  stbi_write_png(path.c_str(), w, h, 4, pixBuf, pitch);
+  free(pixBuf);
+
+  std::cout << "Saved screenshot to: " << path << "\n";
 }
