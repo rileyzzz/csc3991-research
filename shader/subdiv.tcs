@@ -6,10 +6,12 @@ layout (vertices=3) out;
 
 // in vec4 fragPos[];
 in vec3 fragNormal[];
+in vec4 fragTangent[];
 in vec2 texCoord[];
 
 // out vec4 tess_fragPos[];
 out vec3 tess_fragNormal[];
+out vec4 tess_fragTangent[];
 out vec2 tess_texCoord[];
 
 void main()
@@ -19,6 +21,7 @@ void main()
     gl_out[gl_InvocationID].gl_Position = gl_in[gl_InvocationID].gl_Position;
     // tess_fragPos[gl_InvocationID] = fragPos[gl_InvocationID];
     tess_fragNormal[gl_InvocationID] = fragNormal[gl_InvocationID];
+    tess_fragTangent[gl_InvocationID] = fragTangent[gl_InvocationID];
     tess_texCoord[gl_InvocationID] = texCoord[gl_InvocationID];
 
     // ----------------------------------------------------------------------

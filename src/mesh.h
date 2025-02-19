@@ -9,11 +9,17 @@
 #include "texture.h"
 
 #define TILEMESH_UVS
+#define TANGENT_BASIS
 
 struct MeshVertex
 {
   glm::vec3 position;
   glm::vec3 normal;
+
+#ifdef TANGENT_BASIS
+  glm::vec4 tangent;
+#endif // TANGENT_BASIS
+
   glm::vec2 uv;
 };
 

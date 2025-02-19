@@ -6,6 +6,7 @@ uniform mat4 viewProj;
 
 // in vec4 tess_fragPos[];
 in vec3 tess_fragNormal[];
+in vec4 tess_fragTangent[];
 in vec2 tess_texCoord[];
 
 out vec4 fragPos;
@@ -68,24 +69,26 @@ void main()
 
     vec3 normal = normalize(n0 * u + n1 * v + n2 * w);
 
+    vec4 tg0 = tess_fragTangent[0];
+    vec4 tg1 = tess_fragTangent[1];
+    vec4 tg2 = tess_fragTangent[2];
+    float bitangentSign = tg0.w;
+
+    vec3 tangent = normalize(tg0.xyz * u + tg1.xyz * v + tg2.xyz * w);
+
+    vec3 bitangent = normalize(cross(normal, tangent)) * bitangentSign;
+
+    mat3 TBN = mat3(tangent, bitangent, normal);
+
+    vec3 displaceTangent = normalize(vec3(1.0, 0.0, dx));
+    vec3 displaceBitangent = normalize(vec3(0.0, 1.0, dy));
+    vec3 displaceNormal = normalize(cross(displaceTangent, displaceBitangent));
+
     vec4 p = p0 * u + p1 * v + p2 * w;
     p.xyz += normal.xyz * height;
 
-    vec3 tangent;
-    vec3 bitangent;
-    computeBasis(p0.xyz, p1.xyz, p2.xyz, t0, t1, t2, tangent, bitangent);
-    vec3 triNormal = normalize(cross(tangent, bitangent));
-    // vec3 triNormal = normal;
-
-    bitangent = normalize(cross(normal, tangent));
-    tangent = normalize(cross(bitangent, normal));
-
-    // Modify tangent basis based on displacement.
-    tangent -= triNormal * dx;
-    bitangent -= triNormal * dy;
-
     // recalc normal
-    normal = normalize(cross(tangent, bitangent));
+    normal = normalize(TBN * displaceNormal);
 
     fragNormal = normal.xyz;
 

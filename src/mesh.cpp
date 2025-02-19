@@ -7,6 +7,49 @@
 #include <iostream>
 #include <filesystem>
 
+// https://github.com/assimp/assimp/blob/master/code/PostProcessing/CalcTangentsProcess.cpp
+static void ComputeBasis(const glm::vec3& p0, const glm::vec3& p1, const glm::vec3& p2, const glm::vec2& u0, const glm::vec2& u1, const glm::vec2& u2, glm::vec3& tangent, glm::vec3& bitangent)
+{
+  glm::vec3 v = (p1 - p0);
+  glm::vec3 w = (p2 - p0);
+  glm::vec2 s = u1 - u0;
+  glm::vec2 t = u2 - u0;
+
+  float dirCorrect = (t.x * s.y - t.y * s.x) < 0 ? -1 : 1;
+  if (s.x * t.y == s.y * t.x)
+  {
+    s = glm::vec2(0, 1);
+    t = glm::vec2(1, 0);
+  }
+
+  tangent = (w * s.y - v * t.y) * dirCorrect;
+  bitangent = (w * s.x - v * t.x) * dirCorrect;
+}
+
+static void CalcTangents(MeshPartData& part)
+{
+  int nTriangles = part.idx.size() / 3;
+  for (int iTri = 0; iTri < nTriangles; ++iTri)
+  {
+    MeshVertex& v0 = part.vtx[part.idx[iTri * 3 + 0]];
+    MeshVertex& v1 = part.vtx[part.idx[iTri * 3 + 1]];
+    MeshVertex& v2 = part.vtx[part.idx[iTri * 3 + 2]];
+
+    glm::vec3 tangent;
+    glm::vec3 bitangent;
+    ComputeBasis(v0.position, v1.position, v2.position, v0.uv, v1.uv, v2.uv, tangent, bitangent);
+
+    glm::vec3 faceNormal = glm::normalize(glm::cross(v1.position - v0.position, v2.position - v0.position));
+    glm::vec3 estimatedBitangent = glm::normalize(glm::cross(faceNormal, tangent));
+
+    float bitangentSign = glm::sign(glm::dot(bitangent, estimatedBitangent)) * -1;
+
+    v0.tangent = glm::vec4(tangent, bitangentSign);
+    v1.tangent = glm::vec4(tangent, bitangentSign);
+    v2.tangent = glm::vec4(tangent, bitangentSign);
+  }
+}
+
 MeshPart::MeshPart(const MeshPartData& data)
 {
   if (!data.diffuseTex.empty())
@@ -51,10 +94,17 @@ MeshPart::MeshPart(const MeshPartData& data)
   glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(MeshVertex), (void*)offset);
   offset += size;
 
+#ifdef TANGENT_BASIS
+  size = 4 * sizeof(float);
+  glEnableVertexAttribArray(2);
+  glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(MeshVertex), (void*)offset);
+  offset += size;
+#endif // TANGENT_BASIS
+
   // uv
   size = 2 * sizeof(float);
-  glEnableVertexAttribArray(2);
-  glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(MeshVertex), (void*)offset);
+  glEnableVertexAttribArray(3);
+  glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, sizeof(MeshVertex), (void*)offset);
   offset += size;
 
   glBindVertexArray(0);
@@ -428,9 +478,10 @@ GPUMeshStreams::GPUMeshStreams(size_t maxVerts, size_t maxIndices)
 
   #ifdef TILEMESH_UVS
   // uv
+  // use attribute 3 to skip tangent attribute
   size = 2 * sizeof(float);
-  glEnableVertexAttribArray(2);
-  glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(MeshVertexPadded), (void*)offset);
+  glEnableVertexAttribArray(3);
+  glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, sizeof(MeshVertexPadded), (void*)offset);
   offset += size;
   #endif // TILEMESH_UVS
 
@@ -528,7 +579,11 @@ void Mesh::loadFromFile(const std::string& file)
 
   // Finalize parts.
   for (int iPart = 0; iPart < partData.size(); ++iPart)
+  {
+    CalcTangents(partData[iPart]);
+
     m_parts.emplace_back(partData[iPart]);
+  }
 }
 
 void Mesh::draw() const
