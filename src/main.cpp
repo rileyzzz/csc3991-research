@@ -845,6 +845,12 @@ static void updateInput(GLFWwindow* window, float dt)
   if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
     offsetCameraPos.y -= speed * 0.5f;
 
+  float scrollSpeed = speed * 0.5f;
+  if (glfwGetKey(window, GLFW_KEY_PAGE_UP) == GLFW_PRESS)
+    glfwScrollCallback(nullptr, 0, scrollSpeed);
+  if (glfwGetKey(window, GLFW_KEY_PAGE_DOWN) == GLFW_PRESS)
+    glfwScrollCallback(nullptr, 0, -scrollSpeed);
+
   cameraCenterPos += offsetCameraPos;
 
   bool wasDraggingMouse = bDraggingMouse;
