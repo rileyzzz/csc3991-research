@@ -120,6 +120,7 @@ const char* s_meshTargetNames[(int)MeshTarget::Count] = {
 enum class TileMeshes : int
 {
   Brick,
+  InsetCube,
   Sponza,
 
   Count
@@ -127,6 +128,7 @@ enum class TileMeshes : int
 
 const char* s_tileMeshNames[(int)TileMeshes::Count] = {
   "Brick",
+  "Inset Cube",
   "Sponza"
 };
 
@@ -329,7 +331,12 @@ int main()
   s_tileDiffTextures[(int)TileMeshes::Brick] = nullptr;
   s_tileDispTextures[(int)TileMeshes::Brick] = std::make_unique<Texture>((std::filesystem::path(SCENE_DIR) / "brick.jpg").string());
 
-  s_tileMeshes[(int)TileMeshes::Sponza] = loadTileMesh("sponza_brick.obj");
+  s_tileMeshes[(int)TileMeshes::InsetCube] = loadTileMesh("cube_in_cube.obj");
+  s_tileDiffTextures[(int)TileMeshes::InsetCube] = nullptr;
+  s_tileDispTextures[(int)TileMeshes::InsetCube] = std::make_unique<Texture>((std::filesystem::path(SCENE_DIR) / "inset_cubes_heights.tga").string());
+
+  //s_tileMeshes[(int)TileMeshes::Sponza] = loadTileMesh("sponza_brick.obj");
+  s_tileMeshes[(int)TileMeshes::Sponza] = loadTileMesh("sponza_brick_2.obj");
   s_tileDiffTextures[(int)TileMeshes::Sponza] = std::make_unique<Texture>((std::filesystem::path(SCENE_DIR) / "sponza/textures/spnza_bricks_a_diff.png").string());
   s_tileDispTextures[(int)TileMeshes::Sponza] = std::make_unique<Texture>((std::filesystem::path(SCENE_DIR) / "sponza/textures/spnza_bricks_a_bump.png").string());
 

@@ -32,6 +32,16 @@ void computeBasis(vec3 p0, vec3 p1, vec3 p2, vec2 u0, vec2 u1, vec2 u2, out vec3
   bitangent = (w * s.x - v * t.x) * dirCorrect;
 }
 
+float triangleArea(vec2 a, vec2 b, vec2 c)
+{
+    float l0 = length(b - a);
+    float l1 = length(c - a);
+    float l2 = length(c - b);
+
+    float s = 0.5 * (l0 + l1 + l2);
+    return sqrt(s * (s - l0) * (s - l1) * (s - l2));
+}
+
 void main()
 {
     float u = gl_TessCoord.x;
@@ -44,13 +54,19 @@ void main()
 
     texCoord = t0 * u + t1 * v + t2 * w;
 
+    // float uvArea = triangleArea(t0, t1, t2);
+    float l0 = length(t1 - t0);
+    float l1 = length(t2 - t0);
+    float l2 = length(t2 - t1);
+    float maxSide = max(max(l0, l1), l2);
+
     // flip uv
     // texCoord.y = 1 - texCoord.y;
 
     float heightStrength = 0.05;
     float height = texture(displacement, texCoord).r * heightStrength;
 
-    float t = 0.005;
+    float t = 0.01 * maxSide;
     float dx = ((texture(displacement, texCoord + vec2(t, 0)).r - texture(displacement, texCoord - vec2(t, 0)).r) / (2 * t)) * heightStrength;
     // float dx = ((texture(displacement, texCoord + vec2(t, 0)).r * heightStrength - height) / t);
     float dy = ((texture(displacement, texCoord + vec2(0, t)).r - texture(displacement, texCoord - vec2(0, t)).r) / (2 * t)) * heightStrength;
